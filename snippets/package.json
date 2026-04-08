@@ -1,0 +1,32 @@
+{
+    "name": "my-snippets",
+    "engines": {
+        "vscode": "^1.11.0"
+    },
+    "contributes": {
+        "snippets": [
+            {
+                "language": "quarto",
+                "path": "./quarto.json"
+            },
+            {
+                "language": ["markdown", "quarto"],
+                "path": "./markdown.json"
+            },
+            {
+                "language": [
+                    "json"
+                ],
+                "path": "./json.json"
+            },
+            {
+                "language": ["css", "scss"],
+                "path": "./css.json"
+            },
+            {
+                "language": "tex",
+                "path": "./tex.json"
+            }
+    ]
+    }
+}

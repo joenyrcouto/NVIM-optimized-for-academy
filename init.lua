@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -600,9 +600,12 @@ require('lazy').setup({
       --  See `:help lsp-config` for information about keys and how to configure
       ---@type table<string, vim.lsp.Config>
       local servers = {
+        marksman = {}, -- Para Markdown e Quarto
+        julials = {}, -- Para Julia
+        tinymist = {}, -- O melhor LSP moderno para Typst (muito mais rápido que o typst_lsp)
+        pyright = {}, -- Para Python (opcional, se você usar)
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
         -- rust_analyzer = {},
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -710,6 +713,7 @@ require('lazy').setup({
     event = 'VimEnter',
     version = '1.*',
     dependencies = {
+      { 'jmbuhr/otter.nvim' },
       -- Snippet Engine
       {
         'L3MON4D3/LuaSnip',
@@ -722,15 +726,20 @@ require('lazy').setup({
           return 'make install_jsregexp'
         end)(),
         dependencies = {
-          -- `friendly-snippets` contains a variety of premade snippets.
-          --    See the README about individual language/framework/plugin snippets:
-          --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          -- `friendly-snippets` contém os atalhos globais (Python, Julia, R, etc)
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              -- 1. Carrega a biblioteca global de snippets
+              require('luasnip.loaders.from_vscode').lazy_load()
+
+              -- 2. Carrega os snippets ACADÊMICOS do Quarto que você copiou do repositório jmbuhr!
+              -- Isso vai ativar os blocos de código específicos para Typst, Quarto e Markdown
+              require('luasnip.loaders.from_vscode').lazy_load {
+                paths = { vim.fn.stdpath 'config' .. '/snippets' },
+              }
+            end,
+          },
         },
         opts = {},
       },
@@ -929,12 +938,12 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommended keymaps
+  require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommended keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
@@ -966,6 +975,35 @@ require('lazy').setup({
       lazy = '💤 ',
     },
   },
+})
+
+-----------------------------------------------------------
+-- INTEGRAÇÃO QUARTO / DATA SCIENCE
+-----------------------------------------------------------
+-- Isso carrega as pastas que você copiou do repositório jmbuhr
+require 'config.global'
+require 'config.autocommands'
+require 'config.keymap'
+-- require 'config.lazy'
+require 'config.redir'
+
+-- Garante o uso do Treesitter para indentação e dobras
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'markdown', 'rmarkdown', 'julia', 'python', 'r' }, -- Adicionei as linguagens explicitamente
+  callback = function()
+    vim.treesitter.start()
+    vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+    vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+    vim.wo.foldmethod = 'expr'
+    -- Opcional: começa com todas as dobras abertas
+    vim.wo.foldlevel = 99
+  end,
+})
+
+-- Ativa o suporte de LSP dentro de blocos de código
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'quarto', 'markdown' },
+  callback = function() require('otter').activate({ 'julia', 'python', 'r' }, true, true, nil) end,
 })
 
 -- The line beneath this is called `modeline`. See `:help modeline`
