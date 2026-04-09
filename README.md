@@ -1,25 +1,26 @@
----
-quarto_extensoes: []
-quarto_gerais: []
-quarto_ignorar_ativos: false
-quarto_usar_local_fisico: false
-quarto_modo_escrita: false
-quarto_comp_nativa: false
-quarto_id: dec93dfc
----
-# Quarto.nvim Otimizado – Fluxo de Estudo Rápido (Beta!! Precisa de revisão de funcionamento do autocomandos do Quarto e estabilidade de uso a longo prazo.)
+# Quarto.nvim Otimizado – Fluxo de Estudo Rápido (Beta!!)
 
-Plugin para Neovim que integra o **Quarto** de forma otimizada para escrita e execução de código durante os estudos. Utiliza diretório **shadow em RAM** (`/tmp`) para acelerar compilações e previews, com controle fino sobre ativos, extensões e modos de compilação.
+Plugin para Neovim que integra o **Quarto**
+de forma otimizada para escrita e execução
+de código durante os estudos. Utiliza
+diretório **shadow em RAM** (`/tmp`) para
+acelerar compilações e previews, com
+controle fino sobre ativos, extensões e
+modos de compilação.
+
+> **Nota:** Este plugin está em fase beta. Os autocomandos de sincronização com o Quarto e a estabilidade a longo prazo ainda precisam de mais testes e validação.
 
 ## ✨ Funcionalidades Principais
 
 - ⚡ **Preview em RAM** – Renderização instantânea sem tocar no disco físico (exceto quando solicitado).
 - 🔁 **Atualização inteligente** – Modo rápido atualiza automaticamente ao sair do modo de inserção; modo compilado apenas sob demanda (`:Quarto -r`).
-- 🧩 **Execução de blocos** – Envia código para REPL (via `vim-slime`) ou copia para clipboard.
+- 🧩 **Execução de blocos** – Envia código para REPL (via `vim-slime`) ou copia para clipboard, com escolha interativa quando ambos estão disponíveis.
 - 📦 **Gerenciamento de ativos** – Sincronização seletiva de pastas `Gerais/` e `Extens/` para o ambiente de compilação.
 - 🗂️ **Templates** – Aplicação ou cópia de templates a partir de `~/Documents/Quarto/temp/`.
 - 🎛️ **Configurações por buffer** – Salvas no frontmatter YAML de cada arquivo (ID persistente, modos, lista de ativos).
 - 🖥️ **Integração com which-key** – Atalhos mnemônicos (`<leader>q` + ...) para todas as ações.
+- ⌨️ **Shift+Enter inteligente** – Executa a célula atual em arquivos Quarto/Julia/Python/R; em outros tipos, exibe uma notificação amigável.
+- 🧹 **LSP otimizado** – Servidores como `julials` só iniciam em arquivos relevantes (`.qmd`, `.jl`, `.md`), economizando recursos.
 
 ---
 
@@ -51,31 +52,47 @@ Plugin para Neovim que integra o **Quarto** de forma otimizada para escrita e ex
 | `:Quarto -k`                       | Para o servidor de preview.                                                               |
 | `:Quarto -c [pdf\|html]`           | Renderização final. Salva conforme configuração de `comp_nativa`.                         |
 | `:Quarto -c -s ...`                | Força salvamento mesmo com erro de compilação.                                            |
-| `:Quarto -b`                       | Lista blocos de código; seleciona um para enviar ao REPL ou copiar.                       |
+| `:Quarto -b`                       | Lista blocos de código; pergunta se quer **enviar ao REPL** ou **copiar para clipboard** (se `vim-slime` disponível). |
 | `:Quarto -l`                       | Abre visualização de logs (preview ou render).                                            |
 | `:Quarto -m`                       | Menu de configurações (modos, ativos, extensões, templates).                              |
 
-### Atalhos via `which-key` (prefixo `<leader>q`)
+### Atalhos via `which-key` (prefixo `<leader>q` e `<leader>r`)
 
-| Atalho      | Ação                                         |
-|-------------|----------------------------------------------|
-| `<leader>qh`| Ajuda (`:Quarto -h`)                         |
-| `<leader>qpf`| Preview rápido HTML                          |
-| `<leader>qpc`| Preview compilado PDF                        |
-| `<leader>qph`| Preview compilado HTML                       |
-| `<leader>qr`| Atualizar preview                            |
-| `<leader>qk`| Parar preview                                |
-| `<leader>qcp`| Renderizar PDF                               |
-| `<leader>qch`| Renderizar HTML                              |
-| `<leader>qb`| Executar bloco de código                     |
-| `<leader>qm`| Abrir configurações                          |
-| `<leader>ql`| Ver logs                                     |
+| Atalho        | Ação                                                    |
+|---------------|---------------------------------------------------------|
+| **Quarto (`<leader>q`)** |                                                         |
+| `<leader>qh`  | Ajuda (`:Quarto -h`)                                    |
+| `<leader>qp`  | Menu de Preview                                         |
+| `<leader>qpf` | Preview rápido HTML                                     |
+| `<leader>qpc` | Preview compilado PDF                                   |
+| `<leader>qph` | Preview compilado HTML                                  |
+| `<leader>qr`  | Atualizar preview                                       |
+| `<leader>qk`  | Parar preview                                           |
+| `<leader>qc`  | Menu de Renderização                                    |
+| `<leader>qcp` | Renderizar PDF                                          |
+| `<leader>qch` | Renderizar HTML                                         |
+| `<leader>qb`  | Executar bloco de código (menu interativo)              |
+| `<leader>qm`  | Abrir configurações                                     |
+| `<leader>ql`  | Ver logs                                                |
+| **Runner (`<leader>r`)** |                                                         |
+| `<leader>rc`  | Executar célula atual                                   |
+| `<leader>ra`  | Executar célula atual e acima                           |
+| `<leader>rA`  | Executar todas as células (mesma linguagem)             |
+| `<leader>rl`  | Executar linha atual                                    |
+| `<leader>r`   | Executar seleção visual (modo visual)                   |
+| `<leader>RA`  | Executar todas as células (todas as linguagens)         |
+
+### Atalhos Globais Adicionais
+
+| Atalho        | Ação                                                                                      |
+|---------------|-------------------------------------------------------------------------------------------|
+| `Shift+Enter` | Em arquivos Quarto/Julia/Python/R/bash: executa a célula atual. Caso contrário, exibe uma mensagem informativa. |
 
 ---
 
 ## 🧠 Mecanismo de Shadow e Configuração YAML
 
-- Cada buffer `.qmd`/.`md` recebe um **ID único** (`quarto_id`) gerado na primeira operação de preview/render e salvo no frontmatter YAML.
+- Cada buffer `.qmd`/`.md` recebe um **ID único** (`quarto_id`) gerado na primeira operação de preview/render e salvo no frontmatter YAML.
 - O diretório shadow é `/tmp/nvim_quarto_shadow/<id>/`. Nele são mantidos:
   - Cópia atualizada do conteúdo do buffer (sincronizada a cada `InsertLeave` e `BufWritePost`).
   - Ativos copiados conforme configuração (gerais e extensões).
@@ -115,15 +132,17 @@ Marque conforme testar:
 - [ ] **Parada do servidor**: `:Quarto -k` mata o processo do Quarto.
 - [ ] **Renderização final (`-c`)**: Gera PDF/HTML e abre automaticamente.
 - [ ] **Forçar salvamento (`-s`)**: Mesmo com erro, o arquivo de saída é mantido/copiado.
-- [ ] **Execução de blocos (`-b`)**: Lista blocos, envia código selecionado para o REPL (slime) ou clipboard.
+- [ ] **Execução de blocos (`-b`)**: Lista blocos, oferece escolha entre enviar ao REPL (se slime disponível) ou copiar.
 - [ ] **Visualização de logs (`-l`)**: Abre split com log de preview ou render.
 - [ ] **Configurações (`-m`)**: Menu interativo altera toggles e ativos; mudanças persistem no YAML.
 - [ ] **Persistência do ID**: `quarto_id` no YAML mantém a mesma pasta shadow entre sessões.
 - [ ] **Sincronização de Gerais**: Pastas/arquivos selecionados são copiados para raiz da compilação.
 - [ ] **Sincronização de Extensões**: Pastas selecionadas são copiadas para `_extensions/`.
 - [ ] **Templates**: Substituir buffer ou copiar conteúdo de template.
-- [ ] **Atalhos which-key**: Todos os mapeamentos `<leader>q...` funcionam.
+- [ ] **Atalhos which-key**: Todos os mapeamentos `<leader>q...` e `<leader>r...` funcionam.
 - [ ] **Ignorar ativos**: Com toggle ativo, nenhum ativo extra é copiado.
+- [ ] **Shift+Enter**: Em arquivos suportados, executa a célula; fora deles, exibe notificação amigável.
+- [ ] **LSP condicional**: `julials` e outros servidores só iniciam nos filetypes configurados.
 
 ---
 
@@ -138,21 +157,22 @@ Marque conforme testar:
 
 ## 🚀 Instalação
 
-Antes vale mencionar que o setup foi feito para sistema de referencimamento Linux, onde os discos são montado em árvores e temos o diretório '/tmp' que é um tmpf (adeque a configuração para funcionar no seu sistema operacional).
+Antes vale mencionar que o setup foi feito para sistema Linux, onde os discos são montados em árvore e temos o diretório `/tmp` que é um tmpfs (adeque a configuração para funcionar no seu sistema operacional).
 
-Faça um fork do repositório e clone no seu `~/.config/nvim/`.  Ou simplesmente clone direto.
+Faça um fork do repositório e clone no seu `~/.config/nvim/`. Ou simplesmente clone direto.
 
 Certifique-se de que os diretórios `~/Documents/Quarto/{Comp,Gerais,Extens,temp}` existam (ou serão criados automaticamente).
 
 ---
 
-Links principais do github que me auxiliou na construção do dotfile:
+## 🔗 Links que auxiliaram na construção do dotfile
+
 - [Neovim](https://github.com/neovim) (onde configurei o neovim limpo do zero e implementei lsp)
 - [Aman9das/quarto-nvim-dotfiles](https://github.com/Aman9das/quarto-nvim-dotfiles) (exportei e atualizei algumas funções para a nova sintaxe do neovim)
-- [quarto-dev/quarto-nvim](https://github.com/quarto-dev/quarto-nvim) (importante para entender funcionamento do Quarto, depedências etc)
+- [quarto-dev/quarto-nvim](https://github.com/quarto-dev/quarto-nvim) (importante para entender funcionamento do Quarto, dependências etc)
 - [jmbuhr/otter.nvim](https://github.com/jmbuhr/otter.nvim) (parte responsável por modular o lsp junto com o autocomplete, de escolha, nos blocos)
-- Além de outras pequisas...
+- Além de outras pesquisas...
 
 ---
 
-**Divirta-se estudando com velocidade!** 🚀
+**Divirta-se estudando e produzindo com velocidade!** 🚀

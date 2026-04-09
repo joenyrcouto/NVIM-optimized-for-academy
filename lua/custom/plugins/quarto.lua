@@ -18,20 +18,6 @@ return {
         },
       },
     },
-    config = function()
-      -- Keymaps para execução de código
-      local runner = require 'quarto.runner'
-      local wk = require 'which-key'
-
-      wk.add {
-        { '<leader>rc', runner.run_cell, desc = 'run cell' },
-        { '<leader>ra', runner.run_above, desc = 'run cell and above' },
-        { '<leader>rA', runner.run_all, desc = 'run all cells (same lang)' },
-        { '<leader>rl', runner.run_line, desc = 'run line' },
-        { '<leader>r', runner.run_range, mode = 'v', desc = 'run visual range' },
-        { '<leader>RA', function() runner.run_all(true) end, desc = 'run all cells (all langs)' },
-      }
-    end,
     opts = {
       lspFeatures = {
         languages = { 'r', 'python', 'julia', 'bash', 'lua', 'html', 'dot' },
@@ -167,19 +153,25 @@ return {
 
       -- Configuração dos servidores via vim.lsp.config (NOVA API)
       local servers = {
-        r_language_server = {},
+        r_language_server = {
+          filetypes = { 'r', 'rmd', 'quarto' },
+        },
         cssls = {},
         html = {},
         emmet_language_server = {},
         dotls = {},
         julials = {
           cmd = { 'julia', '--startup-file=no', '--history-file=no', '-e', 'using LanguageServer; runserver()' },
+          filetypes = { 'julia', 'quarto', 'markdown' }, -- só ativa nesses tipos
         },
-        bashls = {},
+        bashls = {
+          filetypes = { 'sh', 'bash', 'zsh' },
+        },
         marksman = {
           filetypes = { 'markdown', 'quarto' },
         },
         lua_ls = {
+          filetypes = { 'lua' },
           settings = {
             Lua = {
               diagnostics = { globals = { 'vim', 'quarto' } },
@@ -188,6 +180,7 @@ return {
           },
         },
         pyright = {
+          filetypes = { 'python' },
           settings = {
             python = {
               analysis = {

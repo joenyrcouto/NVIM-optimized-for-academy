@@ -187,7 +187,7 @@ vim.diagnostic.config {
   jump = { on_jump = true },
 }
 
-vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+vim.keymap.set('n', '<leader>dq', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
@@ -975,35 +975,6 @@ require('lazy').setup({
       lazy = '💤 ',
     },
   },
-})
-
------------------------------------------------------------
--- INTEGRAÇÃO QUARTO / DATA SCIENCE
------------------------------------------------------------
--- Isso carrega as pastas que você copiou do repositório jmbuhr
-require 'config.global'
-require 'config.autocommands'
-require 'config.keymap'
--- require 'config.lazy'
-require 'config.redir'
-
--- Garante o uso do Treesitter para indentação e dobras
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = { 'markdown', 'rmarkdown', 'julia', 'python', 'r' }, -- Adicionei as linguagens explicitamente
-  callback = function()
-    vim.treesitter.start()
-    vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-    vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
-    vim.wo.foldmethod = 'expr'
-    -- Opcional: começa com todas as dobras abertas
-    vim.wo.foldlevel = 99
-  end,
-})
-
--- Ativa o suporte de LSP dentro de blocos de código
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = { 'quarto', 'markdown' },
-  callback = function() require('otter').activate({ 'julia', 'python', 'r' }, true, true, nil) end,
 })
 
 -- The line beneath this is called `modeline`. See `:help modeline`
