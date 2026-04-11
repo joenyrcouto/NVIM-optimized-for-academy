@@ -16,6 +16,7 @@ require 'config.keymap'
 -- require 'config.lazy'
 require 'config.redir'
 require 'quarto_autocmds'
+require 'couto_mappings'
 
 -- Garante o uso do Treesitter para indentação e dobras
 vim.api.nvim_create_autocmd('FileType', {
@@ -65,6 +66,29 @@ return {
     },
     dependencies = {
       'nvim-lua/plenary.nvim',
+    },
+  },
+
+  {
+    'epwalsh/obsidian.nvim',
+    version = '*',
+    lazy = false,
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    opts = {
+      workspaces = { { name = 'estudos', path = '~/Documents/brain' } },
+      -- ADICIONE ISSO AQUI:
+      templates = {
+        subdir = 'content/99-brutos/templates', -- Caminho a partir da raiz do vault
+        date_format = '%Y-%m-%d',
+        time_format = '%H:%M',
+        substitutions = {},
+      },
+      extensions = { '.md', '.qmd' },
+      completion = { nvim_cmp = false, min_chars = 2 },
+      attachments = { folder = 'content/99-brutos' }, -- Ajustei para 'content' para o Quartz não se perder
+      daily_notes = { folder = 'content/00-rápidas', date_format = '%Y-%m-%d' },
+      legacy_commands = false,
+      ui = { enable = false },
     },
   },
 }

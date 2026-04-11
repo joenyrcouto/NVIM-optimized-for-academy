@@ -1,5 +1,63 @@
+# 🚀 Neovim Acadêmico: Quarto + Obsidian + Zettelkasten (Beta em test!!)
 
-**Shadow (RAM):** `/tmp/nvim_quarto_shadow/<id>/` – cada buffer recebe um ID único (hash do caminho + timestamp) persistido no YAML.
+*Este repositório contém uma configuração personalizada baseada no **Neovim**, otimizada para pesquisadores, estudantes e escritores técnicos. O objetivo principal é unir o poder do **Obsidian** (gestão de notas) com a flexibilidade do **Quarto** (publicação científica), tudo processado de forma ultraveloz em memória RAM (Shadow Sync).*
+
+> **Nota sobre Shadow (RAM):** `/tmp/nvim_quarto_shadow/<id>/` – cada buffer recebe um ID único (hash do caminho + timestamp) persistido no YAML.
+
+---
+
+## 📖 Como Funciona (Resumo de Uso)
+
+### 1. Fluxo Obsidian (Vault)
+
+O sistema está configurado para ler seu Vault em `~/Documents/ObsidianVault`. 
+
+- Ao abrir um arquivo `.md` ou `.qmd`, os comandos do Obsidian são ativados.
+- Use `<Enter>` para navegar entre notas como se estivesse em um browser.
+- O sistema de templates busca modelos em `content/99 Arquivos brutos/Templates`.
+
+
+
+### 2. Fluxo Quarto (Shadow RAM)
+
+A grande inovação desta config é o **Shadow System**. Ao iniciar um `:Quarto -p`:
+1. O Neovim cria uma cópia do seu buffer atual (mesmo não salvo) em `/tmp`.
+2. Sincroniza extensões e arquivos gerais necessários.
+3. Roda o motor do Quarto nesta pasta temporária.
+
+Isso impede que arquivos auxiliares de compilação "sujem" suas pastas de documentos. O **Modo Escrita** (`:Quarto -m`) desliga a execução de códigos pesados (Python/R/Julia), permitindo que você veja o texto mudar no preview quase em tempo real enquanto escreve.
+
+### 3. Histórico e Git
+
+- **UndoTree**: Não perca nada. O histórico é persistente e visual. Se entrar no modo de inserção, o menu fecha automaticamente para limpar sua visão.
+
+- **LazyGit**: Gerencie versões sem sair do terminal. Se a pasta não for um repositório git, o Neovim perguntará se você deseja iniciar um.
+
+quarto_gerais: []
+quarto_ignorar_ativos: false
+quarto_usar_local_fisico: false
+quarto_modo_escrita: false
+quarto_comp_nativa: false
+quarto_id: d7fed153
+quarto_extensoes: []
+---
+
+## 📂 Estrutura de Pastas Necessária
+
+Para que o sistema de ativos e compilação funcione, certifique-se de ter esta estrutura:
+
+```text
+Documents/
+├── brain/                     # Seu Vault do Obsidian
+│   └── content/
+│       ├── 00-rápidas/
+│       └── 99-brutos/
+└── Quarto/
+    ├── Extens/                # Extensões do Quarto (_extensions)
+    ├── Gerais/                # Imagens, CSS e bibliotecas globais
+    ├── Temp/                  # Templates de código (.qmd, .txt)
+    └── Comp/                  # Pasta onde as renderizações finais são salvas
+```
 
 ---
 
@@ -56,8 +114,6 @@
 | Atalho        | Ação                                                                                      |
 |---------------|-------------------------------------------------------------------------------------------|
 | `Shift+Enter` | Em arquivos Quarto/Julia/Python/R/bash: executa a célula atual. Caso contrário, exibe uma mensagem informativa. |
-
----
 
 ## 🗺️ Atalhos Personalizados do `config.keymap.lua`
 
@@ -147,7 +203,7 @@ Estes atalhos foram herdados de uma configuração prévia e complementam o flux
 
 | Atalho        | Ação                                           |
 |---------------|------------------------------------------------|
-| `<leader>gg`  | Abrir painel do Lazygit                        |
+| `<leader>gg`  | Abrir painel do LazyGit                        |
 | `<leader>gs`  | Abrir painel do Gitsigns                       |
 | `<leader>gb`  | Git Blame (toggle, copy URL, open URL)         |
 | `<leader>gc`  | Atualizar conflitos (GitConflict)              |
@@ -211,8 +267,20 @@ Estes atalhos foram herdados de uma configuração prévia e complementam o flux
 
 ## ✅ Checklist de Funcionalidades (para validação)
 
-Marque conforme testar:
+O que foi testado no commit atual:
 
+### 📗 Obsidian & Vault
+
+- [x] `ObsidianFollowLink`: Seguir links de notas com `<Enter>` no modo normal.
+- [ ] `ObsidianPasteImg`: Colar imagens diretamente da área de transferência para a pasta de anexos com `<leader>oi`.
+- [ ] `ObsidianBacklinks`: Visualizar notas que citam o arquivo atual com `<leader>ob`.
+- [ ] `ObsidianRename`: Renomear nota atual atualizando todos os links existentes com `<leader>R`.
+- [ ] `Daily Notes`: Criação automática de notas diárias em `content/00 Notas Rápidas`.
+
+### 🧪 Quarto Shadow System (Virtual RAM)
+
+- [ ] **ID Virtual**: Injeção de ID único de 8 caracteres no YAML do buffer (RAM) sem salvar no disco via `:Quarto -rn`.
+- [ ] **Persistência do ID**: `quarto_id` no YAML mantém a mesma pasta shadow entre sessões.
 - [ ] **Shadow em RAM**: Preview e render usam `/tmp`, não disco (exceto se `usar_local_fisico` ativo).
 - [ ] **Atualização automática (modo rápido)**: Ao sair do Insert, preview HTML é atualizado sem intervenção.
 - [ ] **Preview compilado**: Com `-c`, executa código e só atualiza com `:Quarto -r`.
@@ -223,7 +291,6 @@ Marque conforme testar:
 - [ ] **Execução de blocos (`-b`)**: Lista blocos, oferece escolha entre enviar ao REPL (se slime disponível) ou copiar.
 - [ ] **Visualização de logs (`-l`)**: Abre split com log de preview ou render.
 - [ ] **Configurações (`-m`)**: Menu interativo altera toggles e ativos; mudanças persistem no YAML.
-- [ ] **Persistência do ID**: `quarto_id` no YAML mantém a mesma pasta shadow entre sessões.
 - [ ] **Sincronização de Gerais**: Pastas/arquivos selecionados são copiados para raiz da compilação.
 - [ ] **Sincronização de Extensões**: Pastas selecionadas são copiadas para `_extensions/`.
 - [ ] **Templates**: Substituir buffer ou copiar conteúdo de template.
@@ -231,6 +298,13 @@ Marque conforme testar:
 - [ ] **Ignorar ativos**: Com toggle ativo, nenhum ativo extra é copiado.
 - [ ] **Shift+Enter**: Em arquivos suportados, executa a célula; fora deles, exibe notificação amigável.
 - [ ] **LSP condicional**: `julials` e outros servidores só iniciam nos filetypes configurados.
+- [ ] **Link de Acesso**: Notificação com link `file://` clicável após renderização concluída.
+
+### ⌨️ Shortcuts & Fluxo de Trabalho
+
+- [ ] **Undotree**: Alternar visualização do histórico de edições com `<C-u>` (funciona em modo Insert e Normal).
+- [ ] **LazyGit**: Interface Git completa em aba flutuante com `<leader>gg`.
+- [ ] **Navegação de Abas**: Alternar buffers com `<Tab>` e `<S-Tab>`.
 
 ---
 

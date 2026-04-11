@@ -59,11 +59,7 @@ local function parse_yaml_config(bufnr)
   local start, finish = get_yaml_range(bufnr)
   if not start then return {} end
 
-  -- Correção: O índice inicial em Neovim API é 0-based.
-  -- Para pegar as linhas internas, o início é (start + 1) - 1 = start.
-  -- O final exclusivo é (finish - 1) = finish - 1.
   local lines = api.nvim_buf_get_lines(bufnr, start, finish - 1, false)
-
   local config = {}
   for _, line in ipairs(lines) do
     local key, value = line:match '^(quarto_[%w_]+):%s*(.*)$'
@@ -143,9 +139,6 @@ local function update_yaml_config(bufnr, updates)
   end
   table.insert(new_block, '---')
 
-  -- Correção Fundamental: Substitui o bloco exato.
-  -- O início (0-based) de 'start' é 'start - 1'.
-  -- O término exclusivo de 'finish' é o próprio 'finish'.
   api.nvim_buf_set_lines(bufnr, start - 1, finish, false, new_block)
 end
 
@@ -158,8 +151,8 @@ local default_config = {
   quarto_id = nil,
   quarto_comp_nativa = false,
   quarto_modo_escrita = false,
-  quarto_usar_local_fisico = false,
-  quarto_ignorar_ativos = false,
+  quarto_usar_local_fisico = true, -- padrão: usa local físico se não houver ID
+  quarto_ignorar_ativos = true, -- padrão: ignora ativos se não houver ID
   quarto_gerais = {},
   quarto_extensoes = {},
 }
@@ -175,6 +168,12 @@ local function get_buffer_config(bufnr)
 
   local yaml = parse_yaml_config(bufnr)
   local config = vim.tbl_deep_extend('force', {}, default_config, yaml)
+
+  -- Se não há ID no YAML, força modo local e ignora ativos (comportamento padrão)
+  if not config.quarto_id then
+    config.quarto_usar_local_fisico = true
+    config.quarto_ignorar_ativos = true
+  end
 
   local gerais_set = {}
   for _, name in ipairs(config.quarto_gerais or {}) do
@@ -207,17 +206,51 @@ local function save_buffer_config(bufnr)
   update_yaml_config(bufnr, updates)
 end
 
-local function ensure_buffer_id(bufnr)
+local function ensure_buffer_id(bufnr, force_create)
   if not is_supported_extension(bufnr) then return fn.sha256(tostring(os.time()) .. tostring(bufnr)):sub(1, 8) end
 
   local config = get_buffer_config(bufnr)
-  if not config.quarto_id then
+  if not config.quarto_id and force_create then
     local buf_name = api.nvim_buf_get_name(bufnr)
     local base = buf_name ~= '' and buf_name or tostring(os.time())
     config.quarto_id = fn.sha256(base .. os.time()):sub(1, 8)
     save_buffer_config(bufnr)
   end
   return config.quarto_id
+end
+
+-- =========================================================================
+--  Função para perguntar se deseja criar configuração shadow
+-- =========================================================================
+local function prompt_shadow_setup(bufnr, reason)
+  local choice = vim.fn.confirm(
+    'Arquivo sem configuração Quarto (sem ID). Deseja criar configuração shadow (RAM) para "'
+      .. reason
+      .. '"?\n'
+      .. 'Sim: cria ID e permite preview/compilação otimizada.\n'
+      .. 'Não: usará modo local (sem /tmp).',
+    '&Sim\n&Não',
+    1,
+    'Question'
+  )
+  if choice == 1 then
+    -- Cria ID e salva
+    ensure_buffer_id(bufnr, true)
+    -- Após criar ID, recarrega a config do cache para refletir os novos valores
+    buffer_config_cache[bufnr] = nil
+    local config = get_buffer_config(bufnr)
+    config.quarto_usar_local_fisico = false -- com shadow, padrão é usar shadow
+    config.quarto_ignorar_ativos = false -- com shadow, por padrão não ignora
+    save_buffer_config(bufnr)
+    return true
+  else
+    -- Usuário recusou: mantém modo local
+    local config = get_buffer_config(bufnr)
+    config.quarto_usar_local_fisico = true
+    config.quarto_ignorar_ativos = true
+    -- Não salva no YAML, apenas em memória
+    return false
+  end
 end
 
 -- =========================================================================
@@ -274,7 +307,8 @@ local function get_shadow_info(bufnr)
   local buf_name = api.nvim_buf_get_name(bufnr)
   if buf_name == '' then return nil end
   local name = fn.fnamemodify(buf_name, ':t')
-  local id = ensure_buffer_id(bufnr)
+  local id = ensure_buffer_id(bufnr, false) -- não força criação aqui
+  if not id then return nil end
   local work_dir = shadow_root .. '/' .. id
   fn.mkdir(work_dir, 'p')
   return { dir = work_dir, path = work_dir .. '/' .. name }
@@ -357,13 +391,12 @@ local function stop_preview()
   end
   fn.system "pkill -f 'quarto preview'"
   preview_state.mode = nil
-  preview_state.browser_opened = false -- Reseta o estado ao parar
+  preview_state.browser_opened = false
 end
 
 local function start_preview(shadow_info, file_path, fmt, compile, config)
   stop_preview()
 
-  -- Constrói a base do comando
   local cmd_parts = {
     'quarto',
     'preview',
@@ -375,16 +408,9 @@ local function start_preview(shadow_info, file_path, fmt, compile, config)
     '--no-browser',
   }
 
-  -- Lógica de compilação x preview rápido
-  if not compile then
-    table.insert(cmd_parts, '--no-execute')
-
-    -- Se o modo de escrita NÃO estiver ativo, desabilita o watch.
-    -- Se estiver ativo (true), o watch nativo do Quarto processará as atualizações.
-  end
+  if not compile then table.insert(cmd_parts, '--no-execute') end
 
   local cmd = table.concat(cmd_parts, ' ')
-
   preview_state.mode = compile and 'compile' or 'fast'
   preview_state.bufnr = api.nvim_get_current_buf()
   preview_state.config = config
@@ -402,7 +428,10 @@ local function start_preview(shadow_info, file_path, fmt, compile, config)
       if url and not preview_state.browser_opened then
         preview_state.url = url
         preview_state.browser_opened = true
-        vim.schedule(function() fn.jobstart { 'xdg-open', url } end)
+        vim.schedule(function()
+          fn.jobstart { 'xdg-open', url }
+          vim.notify('Preview disponível em ' .. url, vim.log.levels.INFO)
+        end)
       end
     end
   end
@@ -498,15 +527,63 @@ local function quarto_handler(args)
       ' :Quarto -m                  → Configurações',
       '',
       ' q para fechar',
-      '',
-      ' Obs: podem ser acessadas com space+q;',
-      'Opções específicas do runner dos blocos em space+r.',
     }, 75)
     return
   end
 
-  local shadow_info = update_shadow_from_buffer(bufnr)
-  if not shadow_info then return end
+  -- Verifica se precisa perguntar sobre shadow para comandos que dependem dele
+  local needs_shadow = (flag == '-p' or flag == '-c' or flag == '-m')
+  local has_id = config.quarto_id ~= nil
+
+  if needs_shadow and not has_id then
+    local reason = (flag == '-p' and 'preview') or (flag == '-c' and 'renderização') or 'configuração'
+    local accepted = prompt_shadow_setup(bufnr, reason)
+    -- Recarrega config após possível criação
+    config = get_buffer_config(bufnr)
+    has_id = config.quarto_id ~= nil
+    if not accepted then
+      -- Usuário recusou: para -m, menu simplificado; para -p/-c, prossegue com local físico
+      if flag == '-m' then
+        -- Menu apenas com Modo Escrita (sem opções de shadow)
+        local lines = {
+          ' === Configurações (Modo Local) ===',
+          '',
+          ' 1. Modo Escrita: ' .. tostring(config.quarto_modo_escrita),
+          '',
+          ' (Sem shadow ativo - apenas modo escrita ajustável)',
+          '',
+          ' Pressione 1 para alternar, q para sair',
+        }
+        local buf, win = open_menu('Configurações (Local)', lines, 60)
+        local function update_line()
+          lines[3] = ' 1. Modo Escrita: ' .. tostring(config.quarto_modo_escrita)
+          api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+        end
+        vim.keymap.set('n', '1', function()
+          config.quarto_modo_escrita = not config.quarto_modo_escrita
+          update_line()
+          -- Salva apenas se houver ID (mas aqui não há, então não salva)
+        end, { buffer = buf })
+        return
+      end
+      -- Para -p e -c, continua com local físico (já é o padrão)
+    end
+  end
+
+  -- Para comandos que precisam de shadow_info
+  local shadow_info = nil
+  if flag == '-r' or flag == '-k' or flag == '-l' or flag == '-p' or flag == '-c' then
+    if config.quarto_usar_local_fisico then
+      -- Modo local: não usa shadow
+      shadow_info = { dir = fn.fnamemodify(original_path, ':p:h'), path = original_path }
+    else
+      shadow_info = update_shadow_from_buffer(bufnr)
+      if not shadow_info then
+        vim.notify('Erro ao preparar shadow. Usando local.', vim.log.levels.WARN)
+        shadow_info = { dir = fn.fnamemodify(original_path, ':p:h'), path = original_path }
+      end
+    end
+  end
 
   local filename_with_ext = fn.fnamemodify(original_path, ':t')
   local filename_no_ext = fn.fnamemodify(original_path, ':t:r')
@@ -561,13 +638,8 @@ local function quarto_handler(args)
     end
     vim.notify('Renderizando ' .. fmt .. '...', vim.log.levels.INFO)
 
-    local compile_dir
-    if config.quarto_usar_local_fisico then
-      compile_dir = fn.fnamemodify(original_path, ':p:h')
-      vim.cmd 'silent! write'
-    else
-      compile_dir = shadow_info.dir
-    end
+    local compile_dir = shadow_info.dir
+    if config.quarto_usar_local_fisico then vim.cmd 'silent! write' end
     sync_assets(compile_dir, config)
 
     local render_log = compile_dir .. '/render.log'
@@ -651,6 +723,12 @@ local function quarto_handler(args)
   end
 
   if flag == '-m' then
+    -- Se não tem ID, não deveria chegar aqui (já tratado acima), mas por segurança
+    if not config.quarto_id then
+      vim.notify('Shadow não configurado. Use :Quarto -p ou -c para criar.', vim.log.levels.WARN)
+      return
+    end
+
     local lines = {
       ' === Configurações (salvas no YAML) ===',
       '',
@@ -800,7 +878,7 @@ local function setup_which_key()
 end
 
 -- =========================================================================
---  Autocmds
+--  Autocmds (mantidos, mas não disparam criação de YAML)
 -- =========================================================================
 api.nvim_create_autocmd('InsertLeave', {
   group = quarto_group,
