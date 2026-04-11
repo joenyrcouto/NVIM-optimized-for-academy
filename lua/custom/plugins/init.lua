@@ -16,7 +16,6 @@ require 'config.keymap'
 -- require 'config.lazy'
 require 'config.redir'
 require 'quarto_autocmds'
-require 'couto_mappings'
 
 -- Garante o uso do Treesitter para indentação e dobras
 vim.api.nvim_create_autocmd('FileType', {
@@ -44,6 +43,7 @@ vim.keymap.set('n', '<S-CR>', function()
   if supported[ft] then
     -- Tenta executar a célula atual (você pode adaptar para o seu runner preferido)
     local ok, runner = pcall(require, 'quarto.runner')
+
     if ok then
       runner.run_cell()
     else
@@ -90,5 +90,47 @@ return {
       legacy_commands = false,
       ui = { enable = false },
     },
+  },
+
+  {
+    'olimorris/codecompanion.nvim',
+    lazy = false,
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-treesitter/nvim-treesitter',
+    },
+    config = function()
+      require('codecompanion').setup {
+        adapters = {
+          http = {
+            lmstudio = function()
+              return require('codecompanion.adapters').extend('openai_compatible', {
+                name = 'lmstudio',
+                env = {
+                  url = 'http://localhost:1234',
+                  api_key = 'sk-lm-Fz8AlBMF:ZuAbScWaKeURH6Wf67qf',
+                },
+                schema = {
+                  model = {
+                    default = 'google/gemma-4-e2b',
+                  },
+                },
+              })
+            end,
+          },
+        },
+        strategies = {
+          chat = {
+            adapter = 'lmstudio',
+          },
+          inline = {
+            adapter = 'lmstudio',
+          },
+          agent = {
+            adapter = 'lmstudio',
+          },
+        },
+      }
+    end,
   },
 }

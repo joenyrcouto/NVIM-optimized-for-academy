@@ -1,27 +1,20 @@
 -- required in which-key plugin spec in plugins/ui.lua as `require 'config.keymap'`
 local wk = require 'which-key'
 local ms = vim.lsp.protocol.Methods
+local map = vim.keymap.set
 
 P = vim.print
 
 vim.g['quarto_is_r_mode'] = nil
 vim.g['reticulate_running'] = false
 
-local nmap = function(key, effect, desc)
-  vim.keymap.set('n', key, effect, { silent = true, noremap = true, desc = desc })
-end
+local nmap = function(key, effect, desc) vim.keymap.set('n', key, effect, { silent = true, noremap = true, desc = desc }) end
 
-local vmap = function(key, effect, desc)
-  vim.keymap.set('v', key, effect, { silent = true, noremap = true, desc = desc })
-end
+local vmap = function(key, effect, desc) vim.keymap.set('v', key, effect, { silent = true, noremap = true, desc = desc }) end
 
-local imap = function(key, effect, desc)
-  vim.keymap.set('i', key, effect, { silent = true, noremap = true, desc = desc })
-end
+local imap = function(key, effect, desc) vim.keymap.set('i', key, effect, { silent = true, noremap = true, desc = desc }) end
 
-local cmap = function(key, effect, desc)
-  vim.keymap.set('c', key, effect, { silent = true, noremap = true, desc = desc })
-end
+local cmap = function(key, effect, desc) vim.keymap.set('c', key, effect, { silent = true, noremap = true, desc = desc }) end
 
 -- select last paste
 nmap('gV', '`[v`]')
@@ -66,9 +59,7 @@ local function send_cell()
   if has_molten then
     molten_works, molten_active = pcall(molten_status.kernels)
   end
-  if molten_works and molten_active ~= vim.NIL and molten_active ~= '' then
-    molten_active = molten_status.initialized()
-  end
+  if molten_works and molten_active ~= vim.NIL and molten_active ~= '' then molten_active = molten_status.initialized() end
   if molten_active ~= vim.NIL and molten_active ~= '' and molten_status.kernels() ~= 'Molten' then
     vim.cmd.QuartoSend()
     return
@@ -186,9 +177,7 @@ end
 local insert_a_code_chunk = function(lang, curly)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<esc>', true, false, true), 'n', true)
   local keys
-  if curly == nil then
-    curly = true
-  end
+  if curly == nil then curly = true end
   if is_code_chunk(lang) then
     if curly then
       keys = [[o```<cr><cr>```{]] .. lang .. [[}<esc>o]]
@@ -206,63 +195,33 @@ local insert_a_code_chunk = function(lang, curly)
   vim.api.nvim_feedkeys(keys, 'n', false)
 end
 
-local insert_code_chunk = function(lang)
-  insert_a_code_chunk(lang, true)
-end
+local insert_code_chunk = function(lang) insert_a_code_chunk(lang, true) end
 
-local insert_plain_code_chunk = function(lang)
-  insert_a_code_chunk(lang, false)
-end
+local insert_plain_code_chunk = function(lang) insert_a_code_chunk(lang, false) end
 
-local insert_r_chunk = function()
-  insert_code_chunk 'r'
-end
+local insert_r_chunk = function() insert_code_chunk 'r' end
 
-local insert_py_chunk = function()
-  insert_code_chunk 'python'
-end
+local insert_py_chunk = function() insert_code_chunk 'python' end
 
-local insert_lua_chunk = function()
-  insert_code_chunk 'lua'
-end
+local insert_lua_chunk = function() insert_code_chunk 'lua' end
 
-local insert_julia_chunk = function()
-  insert_code_chunk 'julia'
-end
+local insert_julia_chunk = function() insert_code_chunk 'julia' end
 
-local insert_bash_chunk = function()
-  insert_code_chunk 'bash'
-end
+local insert_bash_chunk = function() insert_code_chunk 'bash' end
 
-local insert_ojs_chunk = function()
-  insert_code_chunk 'ojs'
-end
+local insert_ojs_chunk = function() insert_code_chunk 'ojs' end
 
+local insert_plain_r_chunk = function() insert_plain_code_chunk 'r' end
 
-local insert_plain_r_chunk = function()
-  insert_plain_code_chunk 'r'
-end
+local insert_plain_py_chunk = function() insert_plain_code_chunk 'python' end
 
-local insert_plain_py_chunk = function()
-  insert_plain_code_chunk 'python'
-end
+local insert_plain_lua_chunk = function() insert_plain_code_chunk 'lua' end
 
-local insert_plain_lua_chunk = function()
-  insert_plain_code_chunk 'lua'
-end
+local insert_plain_julia_chunk = function() insert_plain_code_chunk 'julia' end
 
-local insert_plain_julia_chunk = function()
-  insert_plain_code_chunk 'julia'
-end
+local insert_plain_bash_chunk = function() insert_plain_code_chunk 'bash' end
 
-local insert_plain_bash_chunk = function()
-  insert_plain_code_chunk 'bash'
-end
-
-local insert_plain_ojs_chunk = function()
-  insert_plain_code_chunk 'ojs'
-end
-
+local insert_plain_ojs_chunk = function() insert_plain_code_chunk 'ojs' end
 
 --show kepbindings with whichkey
 --add your own here if you want them to
@@ -317,29 +276,17 @@ wk.add({
   },
 }, { mode = 'i' })
 
-local function new_terminal(lang)
-  vim.cmd('vsplit term://' .. lang)
-end
+local function new_terminal(lang) vim.cmd('vsplit term://' .. lang) end
 
-local function new_terminal_python()
-  new_terminal 'python'
-end
+local function new_terminal_python() new_terminal 'python' end
 
-local function new_terminal_r()
-  new_terminal 'R --no-save'
-end
+local function new_terminal_r() new_terminal 'R --no-save' end
 
-local function new_terminal_ipython()
-  new_terminal 'ipython --no-confirm-exit --no-autoindent'
-end
+local function new_terminal_ipython() new_terminal 'ipython --no-confirm-exit --no-autoindent' end
 
-local function new_terminal_julia()
-  new_terminal 'julia'
-end
+local function new_terminal_julia() new_terminal 'julia' end
 
-local function new_terminal_shell()
-  new_terminal '$SHELL'
-end
+local function new_terminal_shell() new_terminal '$SHELL' end
 
 local function get_otter_symbols_lang()
   local otterkeeper = require 'otter.keeper'
@@ -376,9 +323,7 @@ end
 --- Remove the ~/.cache/nvim/snacks/image directory
 local function clear_image_cache()
   local cache_dir = vim.fn.stdpath 'cache' .. '/snacks/image'
-  if vim.fn.isdirectory(cache_dir) == 1 then
-    vim.fn.delete(cache_dir, 'rf')
-  end
+  if vim.fn.isdirectory(cache_dir) == 1 then vim.fn.delete(cache_dir, 'rf') end
 end
 
 -- eval "$(tmux showenv -s DISPLAY)"
@@ -387,7 +332,6 @@ wk.add({
   {
     { '<leader><cr>', send_cell, desc = 'run code cell' },
     { '<leader>c', group = '[c]ode / [c]ell / [c]hunk' },
-    { '<leader>ci', new_terminal_ipython, desc = 'new [i]python terminal' },
     { '<leader>cj', new_terminal_julia, desc = 'new [j]ulia terminal' },
     { '<leader>cn', new_terminal_shell, desc = '[n]ew terminal with shell' },
     { '<leader>cp', new_terminal_python, desc = 'new [p]ython terminal' },
@@ -440,9 +384,7 @@ wk.add({
     { '<leader>ld', group = '[d]iagnostics' },
     {
       '<leader>ldd',
-      function()
-        vim.diagnostic.enable(false)
-      end,
+      function() vim.diagnostic.enable(false) end,
       desc = '[d]isable',
     },
     { '<leader>lde', vim.diagnostic.enable, desc = '[e]nable' },
@@ -470,9 +412,7 @@ wk.add({
     { '<leader>q', group = '[q]uarto' },
     {
       '<leader>qE',
-      function()
-        require('otter').export(true)
-      end,
+      function() require('otter').export(true) end,
       desc = '[E]xport with overwrite',
     },
     { '<leader>qa', ':QuartoActivate<cr>', desc = '[a]ctivate' },
@@ -498,3 +438,109 @@ wk.add({
     { '<leader>xx', ':w<cr>:source %<cr>', desc = '[x] source %' },
   },
 }, { mode = 'n' })
+
+-- [ CODECOMPANION ]
+-- Menu de Ações (Principal para diagnósticos e correções)
+map({ 'n', 'v' }, '<leader>ca', '<cmd>CodeCompanionActions<cr>', { desc = 'CodeCompanion: Ações' })
+-- Chat Interativo (Para discussões teóricas e lógica)
+map({ 'n', 'v' }, '<leader>cc', '<cmd>CodeCompanionChat Toggle<cr>', { desc = 'CodeCompanion: Alternar Chat' })
+-- Inserção Inline (O "Copilot" sob demanda para criar código)
+map({ 'n', 'v' }, '<leader>ci', '<cmd>CodeCompanion<cr>', { desc = 'CodeCompanion: Prompt Inline' })
+-- Adicionar código ao Chat (Sem sair do buffer atual)
+map('v', 'ga', '<cmd>CodeCompanionChat Add<cr>', { desc = 'CodeCompanion: Adicionar ao Chat' })
+
+-- [ NAVEGAÇÃO ENTRE JANELAS ]
+map('n', '<C-h>', '<C-w>h', { desc = 'Janela à esquerda' })
+map('n', '<C-j>', '<C-w>j', { desc = 'Janela abaixo' })
+map('n', '<C-k>', '<C-w>k', { desc = 'Janela acima' })
+map('n', '<C-l>', '<C-w>l', { desc = 'Janela à direita' })
+
+-- [ RENOMEAR O ARQUIVO ATUAL NO DISCO ]
+map('n', '<leader>rn', function()
+  local old_name = vim.api.nvim_buf_get_name(0)
+  if old_name == '' then return print 'Erro: Arquivo não salvo no disco' end
+
+  local new_name = vim.fn.input('Novo nome do arquivo: ', old_name, 'file')
+
+  if new_name ~= '' and new_name ~= old_name then
+    local uv = vim.uv or vim.loop
+    local ok, err = uv.fs_rename(old_name, new_name)
+
+    if ok then
+      vim.cmd('edit ' .. vim.fn.fnameescape(new_name))
+      vim.cmd('bwipeout ' .. vim.fn.fnameescape(old_name))
+      print('\nArquivo renomeado para: ' .. new_name)
+    else
+      print('\nErro ao renomear: ' .. err)
+    end
+  end
+end, { desc = 'Renomear arquivo físico' })
+
+-- [ NAVEGAÇÃO DE BUSCA E LIMPEZA MANUAL ]
+local function toggle_search_clean()
+  if vim.v.hlsearch == 1 then
+    vim.cmd 'nohlsearch'
+    vim.api.nvim_command "echo ''"
+    vim.cmd 'redraw'
+  else
+    local last_search = vim.fn.getreg '/'
+    if last_search ~= '' then
+      vim.opt.hlsearch = true
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('nN', true, false, true), 'n', true)
+    end
+  end
+end
+
+-- Mapeamento do '?' (Substitui a busca reversa nativa)
+map('n', '?', toggle_search_clean, {
+  desc = 'Toggle Search e Limpar Terminal',
+  silent = true,
+  nowait = true,
+})
+
+-- [ SALVAMENTO E FECHAMENTO ]
+map('n', '<leader>w', '<cmd>w<cr>', { desc = 'salvar arquivo' })
+map('n', '<leader>q', '<cmd>confirm q<cr>', { desc = 'fechar janela atual' })
+map('n', '<leader><esc>', '<cmd>qa!<cr>', { desc = 'sair do neovim forçadamente' })
+
+-- [ NAVEGAÇÃO ENTRE ABAS (BUFFERS - NVCHAD) ]
+map('n', '<Tab>', function() require('nvchad.tabufline').next() end, { desc = 'Próxima Aba' })
+map('n', '<S-Tab>', function() require('nvchad.tabufline').prev() end, { desc = 'Aba Anterior' })
+map('n', '<leader>x', function() require('nvchad.tabufline').close_buffer() end, { desc = 'Fechar Aba' })
+
+-- [ DIVISÃO DE TELA (SPLITS) ]
+map('n', '<leader>v', '<cmd>vsp<cr>', { desc = 'Dividir Verticalmente' })
+map('n', '<leader>h', '<cmd>sp<cr>', { desc = 'Dividir Horizontalmente' })
+
+-- [ TERMINAIS NVCHAD ]
+map({ 'n', 't' }, '<A-h>', function() require('nvchad.term').toggle { pos = 'sp', id = 'htoggle' } end)
+map({ 'n', 't' }, '<A-i>', function() require('nvchad.term').toggle { pos = 'float', id = 'floatTerm' } end)
+
+-------------------------------------------------------------------
+-- [ CONFIGURAÇÕES ESPECÍFICAS DO OBSIDIAN ]
+-------------------------------------------------------------------
+
+-- Tecla ENTER: Seguir Link
+map('n', '<CR>', function()
+  local ok, obsidian = pcall(require, 'obsidian')
+  if ok then
+    local client = obsidian.get_client()
+    if client and client:cursor_on_markdown_link() then
+      vim.cmd 'ObsidianFollowLink'
+      return ''
+    end
+  end
+  return '<CR>'
+end, { expr = true, desc = 'Obsidian: Seguir Link' })
+
+-- Tecla Espaço + Shift + R: Renomear Inteligente
+map('n', '<leader>R', function()
+  if vim.bo.filetype == 'markdown' or vim.bo.filetype == 'quarto' then
+    vim.cmd 'ObsidianRename'
+  else
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<leader>rn', true, false, true), 'm', true)
+  end
+end, { desc = 'Renomear Inteligente' })
+
+map('n', '<leader>oi', '<cmd>ObsidianPasteImg<CR>', { desc = 'Colar Imagem' })
+map('n', '<leader>ob', '<cmd>ObsidianBacklinks<CR>', { desc = 'Ver Backlinks' })

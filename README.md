@@ -33,13 +33,6 @@ Isso impede que arquivos auxiliares de compilação "sujem" suas pastas de docum
 
 - **LazyGit**: Gerencie versões sem sair do terminal. Se a pasta não for um repositório git, o Neovim perguntará se você deseja iniciar um.
 
-quarto_gerais: []
-quarto_ignorar_ativos: false
-quarto_usar_local_fisico: false
-quarto_modo_escrita: false
-quarto_comp_nativa: false
-quarto_id: d7fed153
-quarto_extensoes: []
 ---
 
 ## 📂 Estrutura de Pastas Necessária
@@ -220,6 +213,17 @@ Estes atalhos foram herdados de uma configuração prévia e complementam o flux
 | `<leader>fd`   | Lista de buffers abertos                |
 | `<leader>fM`   | Páginas de manual                       |
 
+### 🤖 CodeCompanion (IA Local via LM Studio)
+
+*Assistente offline integrado ao Neovim, configurado para usar modelos locais (Gemma, Llama, etc.).*
+
+| Atalho        | Modo         | Ação                                                                                   |
+|---------------|--------------|----------------------------------------------------------------------------------------|
+| `<leader>ca`  | Normal/Visual| Abrir menu de ações do CodeCompanion (diagnósticos, correções)                          |
+| `<leader>cc`  | Normal/Visual| Alternar janela de **Chat** interativo (discussões teóricas, lógica)                    |
+| `<leader>ci`  | Normal/Visual| **Prompt Inline**: gerar ou modificar código sob demanda (substitui o antigo `<C-i>`)   |
+| `ga`          | Visual       | **Adicionar ao Chat**: envia a seleção atual para a conversa sem sair do buffer         |
+
 ### Outros Úteis
 
 | Atalho        | Ação                                                     |
@@ -314,6 +318,7 @@ O que foi testado no commit atual:
 - [vim-slime](https://github.com/jpalardy/vim-slime) (para `:Quarto -b`)
 - [which-key.nvim](https://github.com/folke/which-key.nvim) (para atalhos)
 - [otter.nvim](https://github.com/jmbuhr/otter.nvim) (já incluso como dependência do quarto-nvim)
+- [codecompanion.nvim](https://github.com/olimorris/codecompanion.nvim) (IA local com LM Studio)
 
 ---
 
@@ -333,6 +338,7 @@ Certifique-se de que os diretórios `~/Documents/Quarto/{Comp,Gerais,Extens,temp
 - [Aman9das/quarto-nvim-dotfiles](https://github.com/Aman9das/quarto-nvim-dotfiles) (exportei e atualizei algumas funções para a nova sintaxe do neovim)
 - [quarto-dev/quarto-nvim](https://github.com/quarto-dev/quarto-nvim) (importante para entender funcionamento do Quarto, dependências etc)
 - [jmbuhr/otter.nvim](https://github.com/jmbuhr/otter.nvim) (parte responsável por modular o lsp junto com o autocomplete, de escolha, nos blocos)
+- [olimorris/codecompanion.nvim](https://github.com/olimorris/codecompanion.nvim) (assistente IA local)
 - Além de outras pesquisas...
 
 ---

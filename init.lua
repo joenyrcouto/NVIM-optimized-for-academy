@@ -741,7 +741,11 @@ require('lazy').setup({
             end,
           },
         },
-        opts = {},
+        opts = {
+          sources = {
+            default = { 'lsp', 'path', 'snippets', 'buffer', 'codecompanion' },
+          },
+        },
       },
     },
     ---@module 'blink.cmp'
