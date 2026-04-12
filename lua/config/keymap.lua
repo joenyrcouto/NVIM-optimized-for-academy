@@ -544,3 +544,204 @@ end, { desc = 'Renomear Inteligente' })
 
 map('n', '<leader>oi', '<cmd>ObsidianPasteImg<CR>', { desc = 'Colar Imagem' })
 map('n', '<leader>ob', '<cmd>ObsidianBacklinks<CR>', { desc = 'Ver Backlinks' })
+
+-- ==========================================
+-- INTEGRAÇÃO GIT-BUG (GA COM JANELA FLUTUANTE)
+-- ==========================================
+
+local function get_working_dir()
+  local bufpath = vim.api.nvim_buf_get_name(0)
+  if bufpath ~= '' then
+    return vim.fn.fnamemodify(bufpath, ':p:h')
+  else
+    return vim.fn.getcwd()
+  end
+end
+
+local function kitty_remote_available() return os.execute 'kitty @ ls > /dev/null 2>&1' end
+
+local function clean_locks() os.execute 'rm -f .git/refs/bugs/lock .git/refs/bugs.lock .git/git-bug.lock 2>/dev/null' end
+
+local function kitty_float_exec(cmd, cwd)
+  if not kitty_remote_available() then return false end
+  local script_path = vim.fn.stdpath 'cache' .. '/kitty_gitbug.sh'
+  local script_content = string.format(
+    [[
+#!/bin/bash
+cd %s
+export EDITOR=nvim
+%s
+]],
+    vim.fn.shellescape(cwd),
+    cmd
+  )
+  local file = io.open(script_path, 'w')
+  if not file then return false end
+  file:write(script_content)
+  file:close()
+  os.execute('chmod +x ' .. script_path)
+  local kitty_cmd = string.format(
+    'kitty @ launch --type=overlay --title "Git Bug" bash -c %s 2>/dev/null || ' .. 'kitty @ launch --type=window --title "Git Bug" bash -c %s',
+    vim.fn.shellescape(script_path),
+    vim.fn.shellescape(script_path)
+  )
+  return os.execute(kitty_cmd) == 0
+end
+
+local function nvim_term_exec(cmd, cwd, interactive, wait_after)
+  clean_locks()
+  local prefix = 'cd ' .. vim.fn.shellescape(cwd) .. ' && clear; '
+  local suffix = wait_after and "; echo; echo '--- PROCESSO CONCLUÍDO. PRESSIONE ENTER PARA SAIR ---'; read" or '; exit'
+  local full_cmd = prefix .. cmd .. suffix
+  vim.cmd('split | terminal bash -c ' .. vim.fn.shellescape(full_cmd))
+  if interactive then vim.cmd 'startinsert' end
+end
+
+-- =============================================================================
+-- NOVO GA: Janela flutuante para título e descrição
+-- =============================================================================
+local function create_issue_floating()
+  local cwd = get_working_dir()
+
+  -- Cria um buffer temporário em uma janela flutuante
+  local buf = vim.api.nvim_create_buf(false, true)
+  local width = math.floor(vim.o.columns * 0.7)
+  local height = math.floor(vim.o.lines * 0.6)
+  local opts = {
+    relative = 'editor',
+    width = width,
+    height = height,
+    col = (vim.o.columns - width) / 2,
+    row = (vim.o.lines - height) / 2 - 2,
+    style = 'minimal',
+    border = 'rounded',
+    title = ' Nova Issue (Git Bug) ',
+    title_pos = 'center',
+  }
+  local win = vim.api.nvim_open_win(buf, true, opts)
+
+  -- Conteúdo inicial: instruções e campos
+  local lines = {
+    '# Título (obrigatório)',
+    '',
+    '# Descrição (opcional)',
+    '',
+  }
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+  -- Configura o buffer
+  vim.bo[buf].buftype = 'acwrite'
+  vim.bo[buf].filetype = 'markdown'
+
+  -- Mapeamentos locais
+  local function submit()
+    local content = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    local title = nil
+    local desc_lines = {}
+    local in_desc = false
+
+    for _, line in ipairs(content) do
+      if line:match '^# Título' then
+        -- próxima linha será o título
+      elseif not title and not in_desc and line:match '^%s*$' then
+        -- ignora linhas vazias antes do título
+      elseif not title and not in_desc then
+        title = line:match '^%s*(.-)%s*$'
+      elseif line:match '^# Descrição' then
+        in_desc = true
+      elseif in_desc and not line:match '^%s*$' then
+        table.insert(desc_lines, line)
+      end
+    end
+
+    if not title or title == '' then
+      vim.notify('Título é obrigatório', vim.log.levels.WARN)
+      return
+    end
+
+    local desc = table.concat(desc_lines, '\n')
+
+    -- Fecha a janela
+    vim.api.nvim_win_close(win, true)
+
+    -- Executa o git bug em background
+    local cmd = string.format('git bug bug new -t %s -m %s', vim.fn.shellescape(title), vim.fn.shellescape(desc))
+    local full_cmd = string.format('cd %s && %s', vim.fn.shellescape(cwd), cmd)
+
+    vim.notify('Criando issue...', vim.log.levels.INFO)
+    vim.fn.jobstart(full_cmd, {
+      on_exit = function(_, code)
+        if code == 0 then
+          vim.schedule(function() vim.notify('Issue criada com sucesso!', vim.log.levels.INFO) end)
+        else
+          vim.schedule(function() vim.notify('Erro ao criar issue. Verifique o terminal.', vim.log.levels.ERROR) end)
+        end
+      end,
+    })
+  end
+
+  vim.keymap.set('n', '<CR>', submit, { buffer = buf, desc = 'Criar issue' })
+  vim.keymap.set('n', '<C-s>', submit, { buffer = buf })
+  vim.keymap.set('n', 'q', function() vim.api.nvim_win_close(win, true) end, { buffer = buf })
+  vim.keymap.set('i', '<C-s>', submit, { buffer = buf })
+
+  -- Posiciona o cursor na linha do título
+  vim.api.nvim_win_set_cursor(win, { 2, 0 })
+  vim.cmd 'startinsert'
+end
+
+vim.keymap.set('n', '<leader>ga', create_issue_floating, { desc = 'Git Bug: Nova Issue (flutuante)' })
+
+-- =============================================================================
+-- DEMAIS ATALHOS (mantidos)
+-- =============================================================================
+vim.keymap.set('n', '<leader>gi', function()
+  local cwd = get_working_dir()
+  nvim_term_exec('git bug init', cwd, false, true)
+end, { desc = 'Git Bug: Init' })
+
+vim.keymap.set('n', '<leader>gu', function()
+  local cwd = get_working_dir()
+  nvim_term_exec('git bug user adopt', cwd, true, true)
+end, { desc = 'Git Bug: Adotar identidade' })
+
+vim.keymap.set('n', '<leader>gl', function()
+  local cwd = get_working_dir()
+  clean_locks()
+  if not kitty_float_exec('git bug termui', cwd) then
+    vim.notify('Kitty remote indisponível, abrindo no terminal integrado...', vim.log.levels.WARN)
+    nvim_term_exec('git bug termui', cwd, true, false)
+  end
+end, { desc = 'Git Bug: Interface TUI' })
+
+vim.keymap.set('n', '<leader>gp', function()
+  local cwd = get_working_dir()
+  nvim_term_exec('git bug pull && git bug push', cwd, false, true)
+end, { desc = 'Git Bug: Push/Pull' })
+
+vim.keymap.set('n', '<leader>gf', function()
+  local cwd = get_working_dir()
+  local msg = vim.fn.input 'Mensagem do Commit: '
+  if msg == '' then return end
+  local issue_id = vim.fn.input 'ID do Bug (ex: abc123): '
+  if issue_id == '' then return end
+  local cmd = string.format('git commit -m "%s (Fixes %s)"', msg, issue_id)
+  nvim_term_exec(cmd, cwd, false, true)
+end, { desc = 'Git Bug: Commit Fix' })
+
+vim.keymap.set('n', '<leader>gb', function()
+  local cwd = get_working_dir()
+  local token = vim.fn.system('gh auth token 2>/dev/null'):gsub('%s+', '')
+  if token == '' then
+    vim.notify("Token do gh não encontrado. Faça login com 'gh auth login'.", vim.log.levels.WARN)
+    return
+  end
+  local repo = vim.fn.system('cd ' .. vim.fn.shellescape(cwd) .. ' && git remote get-url origin 2>/dev/null'):gsub('%s+', '')
+  local owner_repo = repo:match 'github.com[:/]([^/]+/[^/]+)%.git$' or repo:match 'github.com[:/](.+)$'
+  if not owner_repo then
+    vim.notify('Não foi possível extrair owner/repo.', vim.log.levels.WARN)
+    return
+  end
+  local cmd = string.format('git bug bridge new --name github --type github --url "https://github.com/%s" --token %s', owner_repo, token)
+  nvim_term_exec(cmd, cwd, false, true)
+end, { desc = 'Git Bug: Configurar bridge (gh)' })
