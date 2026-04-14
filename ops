@@ -1,1 +1,1 @@
-{"author":{"id":"777a678def13c2d9894f912d8f786bd61aa76bc930c8b931e4590ea8ca619979"},"ops":[{"type":4,"timestamp":1776201218,"nonce":"A8h8LHQRagyGoVz0R03Cc75Kjkg=","status":2}]}
+{"author":{"id":"777a678def13c2d9894f912d8f786bd61aa76bc930c8b931e4590ea8ca619979"},"ops":[{"type":8,"timestamp":1776201750,"nonce":"U5ESsEffdDJBl6CiWL4Jc1XUnf4=","target":"44ec28e6243d0a5a170cc82efa8b7e937bf481cd29dae6f6d78311c2fc5e3554","new_metadata":{"github-id":"I_kwDOR7ifNM7-M9tF","github-url":"https://github.com/joenyrcouto/NVIM-optimized-for-Quarto/issues/2"}}]}
