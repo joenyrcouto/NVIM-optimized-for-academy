@@ -154,7 +154,7 @@ return {
     config = function(_, opts)
       -- Só ativa o bridge se o arquivo atual estiver dentro do seu Vault
       local path = vim.fn.expand '%:p'
-      if path:find 'Documents/brain' then require('obsidian-bridge').setup(opts) end
+      if path:find '~/Documents/brain' then require('obsidian-bridge').setup(opts) end
     end,
   },
 
