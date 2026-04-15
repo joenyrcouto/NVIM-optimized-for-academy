@@ -28,14 +28,16 @@ export GIT_BUG_USER_EMAIL="$(git config user.email)"
 | `<leader>gp`| **Push/Pull**: envia e recebe atualizações de issues do GitHub.                  |
 | `<leader>gk`| **Gerenciar keyrings**: apaga todas as keyrings ou uma específica (útil para corrigir autenticação). |
 
-## 🔄 Fluxo offline → online
+## 🔄 Fluxo de issues offline → online
 
 1. **Offline**:
    - Crie issues com `<leader>ga` ou `<leader>gl`.
-   - Adicione comentários, altere status, etc. (tudo fica armazenado no `.git`).
+   - Adicione comentários, altere status, etc com `<leader>gl` (tudo fica armazenado no `.git`).
 2. **Online**:
    - Execute `<leader>gp` para enviar tudo ao GitHub.
    - As issues aparecerão na interface web normalmente.
+
+Obs.: O pull e push do `<leader>gl` não interage com os issues do github, ele serve para modificar os arquivos locais/remoto dos repositórios. Use `<leader>gp` para sincronizar com os issues do github!!
 
 ## 🖥️ Configuração do Kitty (para `<leader>gl`)
 
