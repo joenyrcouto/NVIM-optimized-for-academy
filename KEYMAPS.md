@@ -13,10 +13,23 @@ Este documento lista todos os atalhos configurados no `config.keymap.lua` e nos 
 
 ## ✏️ Edição
 
+| Atalho        | Ação                                                    |
+|---------------|---------------------------------------------------------|
+| `<C-s>`       | Salvar arquivo (`:update`)                              |
+| `<C-S-K>`     | Excluir arquivo atual (com confirmação)                 |
+| `<leader>rn`  | Renomear arquivo físico no disco                        |
+| `<leader>e`   | Abrir explorador de arquivos (Neo-tree)                 |
+| `u`           | Desfazer última alteração                               |
+| `<C-r>`       | Refazer alteração desfeita                              |
+| `<leader>v`   | Dividir janela verticalmente (`:vsp`)                   |
+| `<leader>h`   | Dividir janela horizontalmente (`:sp`)                  |
+| `<A-h>`       | Alternar terminal horizontal (toggle)                   |
+| `<A-v>`       | Alternar terminal horizontal (toggle)                   |
+| `<A-i>`       | Alternar terminal com permanencia flutuante (toggle)    |
+| `<leader>oj`  | Inserir bloco de código Julia (` ```{julia} `)          |
+
 | Atalho        | Modo         | Ação                                          |
 |---------------|--------------|-----------------------------------------------|
-| `<C-s>`       | Normal/Insert| Salvar (`:update`)                            |
-| `<C-S-K>`     | Normal       | Excluir arquivo (`:!rm %`)                    |
 | `gV`          | Normal       | Selecionar último texto colado                |
 | `>` / `<`     | Visual       | Indentar / remover indentação (mantém seleção)|
 | `<leader>d/p` | Visual       | Deletar/substituir sem sobrescrever registro  |
@@ -32,6 +45,10 @@ Este documento lista todos os atalhos configurados no `config.keymap.lua` e nos 
 | `fk`   | Lista de keymaps           |
 | `fd`   | Lista de buffers           |
 | `fM`   | Páginas de manual          |
+| `<C-v>`  | Seleciona para a horizontal|
+| `<C-h>`  | Seleciona para a vertical  |
+| `<C-t>`  | Seleciona para uma tab     |
+| `<CR>`   | Seleciona para o buff atual     |
 
 ## 🧪 Quarto Otimizado (`<leader>t`)
 
@@ -60,15 +77,18 @@ Este documento lista todos os atalhos configurados no `config.keymap.lua` e nos 
 | `r`    | Executar seleção visual (modo visual)         |
 | `RA`   | Executar todas as células (todas linguagens)  |
 
-## 🐙 Git‑Bug (`<leader>g`)
+## 🐙 Git (`<leader>g`)
 
-| Atalho | Ação                                          |
-|--------|-----------------------------------------------|
-| `ga`   | Nova issue (janela flutuante)                 |
-| `gl`   | Interface TUI (Kitty float)                   |
-| `gp`   | Sincronizar (push/pull)                       |
-| `gi`   | Init de bugs tracker                          |
-| `gu`   | Adotar/criar identidade                       |
+| Atalho | Ação                                                         |
+|--------|--------------------------------------------------------------|
+| `gi`   | Inicializar git no repositório                           |
+| `gu`   | Gerenciar identidades (criar, selecionar ativa)              |
+| `ga`   | Nova issue (janela flutuante)                                |
+| `gl`   | Interface TUI (Kitty float)                                  |
+| `gp`   | Sincronizar (push/pull) – verifica bridge e identidade       |
+| `gz`   | Configurar bridge com GitHub                         |
+| `gk`   | Gerenciar keyrings (apagar todas ou uma específica)          |
+| `gg`   | Abre o lazygit                           |
 
 ## 🤖 IA – CodeCompanion
 

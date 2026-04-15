@@ -67,6 +67,56 @@ return {
     dependencies = {
       'nvim-lua/plenary.nvim',
     },
+    config = function()
+      local function get_working_dir()
+        local bufpath = vim.api.nvim_buf_get_name(0)
+        if bufpath ~= '' then
+          return vim.fn.fnamemodify(bufpath, ':p:h')
+        else
+          return vim.fn.getcwd()
+        end
+      end
+
+      -- Configura mapeamentos para o buffer do LazyGit quando ele abrir
+      vim.api.nvim_create_autocmd('TermOpen', {
+        pattern = '*lazygit*',
+        callback = function(args)
+          local bufnr = args.buf
+          local opts = { buffer = bufnr, silent = true, nowait = true }
+
+          -- q / Esc / Ctrl+q fecham a janela
+          vim.keymap.set('n', 'q', '<cmd>close<CR>', opts)
+          vim.keymap.set('n', '<Esc>', '<cmd>close<CR>', opts)
+          vim.keymap.set('n', '<C-q>', '<cmd>close<CR>', opts)
+
+          -- Navegação básica
+          vim.keymap.set('n', 'j', 'j', opts)
+          vim.keymap.set('n', 'k', 'k', opts)
+          vim.keymap.set('n', 'gg', 'gg', opts)
+          vim.keymap.set('n', 'G', 'G', opts)
+          vim.keymap.set('n', '/', '/', opts)
+          vim.keymap.set('n', 'n', 'n', opts)
+          vim.keymap.set('n', 'N', 'N', opts)
+
+          -- Enter e Espaço (enviam para o terminal)
+          vim.keymap.set('n', '<CR>', 'i<CR>', opts)
+          vim.keymap.set('n', '<Space>', 'i<Space>', opts)
+
+          -- Teclas de ação do LazyGit (enviam para o terminal)
+          local lazygit_keys = { 'a', 'c', 'd', 'p', 'r', 's', 't', 'v', 'x', 'z', 'A', 'C', 'D', 'P', 'R', 'S', 'T', 'V', 'X', 'Z' }
+          for _, key in ipairs(lazygit_keys) do
+            vim.keymap.set('n', key, 'i' .. key, opts)
+          end
+        end,
+      })
+
+      -- Sobrescreve o atalho <leader>gg para usar o diretório correto
+      vim.keymap.set('n', '<leader>gg', function()
+        local cwd = get_working_dir()
+        vim.cmd('lcd ' .. vim.fn.fnameescape(cwd))
+        require('lazygit').lazygit()
+      end, { desc = 'Open LazyGit' })
+    end,
   },
 
   -- 1. Plugin Principal: Gestão do Vault e Notas

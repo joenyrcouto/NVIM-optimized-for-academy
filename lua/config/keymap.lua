@@ -16,16 +16,6 @@ local imap = function(key, effect, desc) vim.keymap.set('i', key, effect, { sile
 
 local cmap = function(key, effect, desc) vim.keymap.set('c', key, effect, { silent = true, noremap = true, desc = desc }) end
 
--- Reinicia keys sem sair do nvim
-vim.keymap.set('n', '<leader>ks', function()
-  local mod = 'config.keymap'
-  if package.loaded[mod] then package.loaded[mod] = nil end
-  require(mod)
-  local win = 0
-  local x = vim.api.nvim_win_get_position(win)
-  vim.print(x, ' recarregou!')
-end, { desc = 'Recarrega o keymap' })
-
 -- Apagar arquivo (dar um kill nele)
 map('n', '<C-S-K>', function()
   local file = vim.fn.expand '%:p'
@@ -258,7 +248,7 @@ wk.add({
   { '<cm-i>', insert_py_chunk, desc = 'python code chunk' },
   { '<esc>', '<cmd>noh<cr>', desc = 'remove search highlight' },
   { '<m-I>', insert_py_chunk, desc = 'python code chunk' },
-  { '<m-i>', insert_r_chunk, desc = 'r code chunk' },
+  { '<m-j>', insert_julia_chunk, desc = 'j code chunk' },
   { '[q', ':silent cprev<cr>', desc = '[q]uickfix prev' },
   { ']q', ':silent cnext<cr>', desc = '[q]uickfix next' },
   { 'gN', 'Nzzzv', desc = 'center search' },
@@ -295,7 +285,7 @@ wk.add({
     { '<cm-i>', insert_py_chunk, desc = 'python code chunk' },
     { '<m-->', ' <- ', desc = 'assign' },
     { '<m-I>', insert_py_chunk, desc = 'python code chunk' },
-    { '<m-i>', insert_r_chunk, desc = 'r code chunk' },
+    { '<m-j>', insert_julia_chunk, desc = 'julia code chunk' },
     { '<m-m>', ' |>', desc = 'pipe' },
   },
 }, { mode = 'i' })
@@ -522,23 +512,122 @@ map('n', '?', toggle_search_clean, {
   nowait = true,
 })
 
--- [ SALVAMENTO E FECHAMENTO ]
-map('n', '<leader>w', '<cmd>w<cr>', { desc = 'salvar arquivo' })
-map('n', '<leader>q', '<cmd>confirm q<cr>', { desc = 'fechar janela atual' })
-map('n', '<leader><esc>', '<cmd>qa!<cr>', { desc = 'sair do neovim forçadamente' })
-
--- [ NAVEGAÇÃO ENTRE ABAS (BUFFERS - NVCHAD) ]
-map('n', '<Tab>', function() require('nvchad.tabufline').next() end, { desc = 'Próxima Aba' })
-map('n', '<S-Tab>', function() require('nvchad.tabufline').prev() end, { desc = 'Aba Anterior' })
-map('n', '<leader>x', function() require('nvchad.tabufline').close_buffer() end, { desc = 'Fechar Aba' })
-
 -- [ DIVISÃO DE TELA (SPLITS) ]
 map('n', '<leader>v', '<cmd>vsp<cr>', { desc = 'Dividir Verticalmente' })
 map('n', '<leader>h', '<cmd>sp<cr>', { desc = 'Dividir Horizontalmente' })
 
--- [ TERMINAIS NVCHAD ]
-map({ 'n', 't' }, '<A-h>', function() require('nvchad.term').toggle { pos = 'sp', id = 'htoggle' } end)
-map({ 'n', 't' }, '<A-i>', function() require('nvchad.term').toggle { pos = 'float', id = 'floatTerm' } end)
+-- [ TERMINAIS ]
+-- Terminal horizontal (toggle)
+local term_h_buf = nil
+local term_h_win = nil
+
+map({ 'n', 't' }, '<A-h>', function()
+  if term_h_win and vim.api.nvim_win_is_valid(term_h_win) then
+    vim.api.nvim_win_close(term_h_win, true)
+    term_h_win = nil
+    term_h_buf = nil
+  else
+    vim.cmd 'split | terminal'
+    term_h_win = vim.api.nvim_get_current_win()
+    term_h_buf = vim.api.nvim_get_current_buf()
+    vim.cmd 'startinsert'
+
+    vim.api.nvim_create_autocmd('TermClose', {
+      buffer = term_h_buf,
+      callback = function()
+        term_h_win = nil
+        term_h_buf = nil
+      end,
+      once = true,
+    })
+  end
+end, { desc = 'Terminal horizontal (toggle)' })
+
+-- Terminal vertical (toggle)
+local term_v_buf = nil
+local term_v_win = nil
+
+map({ 'n', 't' }, '<A-v>', function()
+  if term_v_win and vim.api.nvim_win_is_valid(term_v_win) then
+    vim.api.nvim_win_close(term_v_win, true)
+    term_v_win = nil
+    term_v_buf = nil
+  else
+    vim.cmd 'vsplit | terminal'
+    term_v_win = vim.api.nvim_get_current_win()
+    term_v_buf = vim.api.nvim_get_current_buf()
+    vim.cmd 'startinsert'
+
+    vim.api.nvim_create_autocmd('TermClose', {
+      buffer = term_v_buf,
+      callback = function()
+        term_v_win = nil
+        term_v_buf = nil
+      end,
+      once = true,
+    })
+  end
+end, { desc = 'Terminal vertical (toggle)' })
+
+-- Terminal flutuante (persistente: hide/show com <A-i>, destroy apenas com exit)
+local term_float_win = nil
+local term_float_buf = nil
+
+map({ 'n', 't' }, '<A-i>', function()
+  if term_float_win and vim.api.nvim_win_is_valid(term_float_win) then
+    -- Janela está visível → esconder (fechar janela, mas manter buffer)
+    vim.api.nvim_win_close(term_float_win, true)
+    term_float_win = nil
+    -- buffer continua existindo em term_float_buf
+  elseif term_float_buf and vim.api.nvim_buf_is_valid(term_float_buf) then
+    -- Buffer existe mas janela não → recriar janela flutuante
+    local width = math.floor(vim.o.columns * 0.8)
+    local height = math.floor(vim.o.lines * 0.8)
+    local opts = {
+      relative = 'editor',
+      width = width,
+      height = height,
+      col = (vim.o.columns - width) / 2,
+      row = (vim.o.lines - height) / 2,
+      style = 'minimal',
+      border = 'rounded',
+      title = ' Terminal ',
+      title_pos = 'center',
+    }
+    term_float_win = vim.api.nvim_open_win(term_float_buf, true, opts)
+    vim.cmd 'startinsert'
+  else
+    -- Nada existe → criar buffer e janela novos
+    local width = math.floor(vim.o.columns * 0.8)
+    local height = math.floor(vim.o.lines * 0.8)
+    local opts = {
+      relative = 'editor',
+      width = width,
+      height = height,
+      col = (vim.o.columns - width) / 2,
+      row = (vim.o.lines - height) / 2,
+      style = 'minimal',
+      border = 'rounded',
+      title = ' Terminal ',
+      title_pos = 'center',
+    }
+    term_float_buf = vim.api.nvim_create_buf(false, true)
+    term_float_win = vim.api.nvim_open_win(term_float_buf, true, opts)
+    vim.fn.termopen(vim.o.shell, { detach = 0 })
+    vim.cmd 'startinsert'
+
+    -- Quando o processo do terminal terminar (exit), resetar completamente
+    vim.api.nvim_create_autocmd('TermClose', {
+      buffer = term_float_buf,
+      callback = function()
+        if term_float_win and vim.api.nvim_win_is_valid(term_float_win) then vim.api.nvim_win_close(term_float_win, true) end
+        term_float_win = nil
+        term_float_buf = nil
+      end,
+      once = true,
+    })
+  end
+end, { desc = 'Terminal flutuante (hide/show, exit to destroy)' })
 
 -------------------------------------------------------------------
 -- [ CONFIGURAÇÕES ESPECÍFICAS DO OBSIDIAN ]
@@ -931,7 +1020,7 @@ vim.keymap.set('n', '<leader>gp', function()
   else
     vim.notify('Erro na sincronização:\n' .. output, vim.log.levels.ERROR)
   end
-end, { desc = 'Git Bug: Push/Pull' })
+end, { desc = 'Git Bug: Push seguido de Pull' })
 
 local function create_issue_floating()
   local cwd = get_working_dir()

@@ -16,18 +16,35 @@
 - `:Quarto -p` copia o buffer para `/tmp` e inicia preview **sem tocar no disco**.
 - Modo **rápido** (padrão) atualiza ao sair do Insert; modo **compilado** (`-c`) executa código e só atualiza com `:Quarto -r`.
 - Menu `:Quarto -m` gerencia ativos, extensões e templates.
+- Atalhos dedicados na tecla `<leader>t`, veja mais em [`QUARTO_SHADOW.md`](./QUARTO_SHADOW.md).
 
-### 🐙 Git offline + Issues (git‑bug)
-- Criação, edição e consulta de issues **totalmente offline**, com sincronização posterior.
-- Atalhos dedicados: `<leader>ga` (nova issue em janela flutuante), `<leader>gl` (interface TUI no Kitty), `<leader>gp` (push/pull).
+### 🐙 Github CLI + Lazygit + Gitsins + Git‑bug
+- Integração e automatização de ferramentas, com criação, edição e consulta de issues **totalmente offline**, com sincronização posterior.
+- Atalhos dedicados na tecla `<leader>g`, veja mais em [`GITBUG.md`](./GITHUB.md).
 
 ### 🤖 IA Local (CodeCompanion + LM Studio)
 - Modelos como Gemma ou Llama rodando localmente via LM Studio.
-- Chat (`<leader>cc`), prompt inline (`<leader>ci`) e ações contextuais (`<leader>ca`).
+- Atalhos dedicados na tecla `<leader>c`, veja mais em [`IA.md`](./IA.md).
 
 ---
 
-## ⌨️ Atalhos essenciais (consulta rápida)
+## ⌨️ Atalhos essenciais
+
+### Edição
+| Atalho        | Ação                                                    |
+|---------------|---------------------------------------------------------|
+| `<C-s>`       | Salvar arquivo (`:update`)                              |
+| `<C-S-K>`     | Excluir arquivo atual (com confirmação)                 |
+| `<leader>rn`  | Renomear arquivo físico no disco                        |
+| `<leader>e`   | Abrir explorador de arquivos (Neo-tree)                 |
+| `u`           | Desfazer última alteração                               |
+| `<C-r>`       | Refazer alteração desfeita                              |
+| `<leader>v`   | Dividir janela verticalmente (`:vsp`)                   |
+| `<leader>h`   | Dividir janela horizontalmente (`:sp`)                  |
+| `<A-h>`       | Alternar terminal horizontal (toggle)                   |
+| `<A-v>`       | Alternar terminal horizontal (toggle)                   |
+| `<A-i>`       | Alternar terminal com permanencia flutuante (toggle)    |
+| `<leader>oj`  | Inserir bloco de código Julia (` ```{julia} `)          |
 
 ### Quarto Otimizado (`<leader>t`)
 | Atalho | Ação |
@@ -47,9 +64,9 @@
 | `<leader>ga` | Nova issue (janela flutuante) |
 | `<leader>gl` | Interface TUI (Kitty float) |
 | `<leader>gp` | Sincronizar (push/pull) |
-| `<leader>gf` | Commit referenciando issue |
-| `<leader>gi` / `gu` | Init / adotar identidade |
-| `<leader>gb` | Configurar bridge com GitHub |
+| `<leader>gu` | Gerenciar identidades (criar/selecionar) |
+| `<leader>gz` | Configurar bridge com GitHub (usa token do `gh`) |
+| `<leader>gk` | Gerenciar keyrings (limpar todas ou específica) |
 
 ### IA (CodeCompanion)
 | Atalho | Modo | Ação |
@@ -59,13 +76,13 @@
 | `<leader>ci` | n/v | Prompt inline |
 | `ga` | v | Adicionar seleção ao chat |
 
-### Outros grupos importantes
+### Outros grupos importantes 
 - **Runner de células** (`<leader>r`) → `rc`, `ra`, `rA`, `rl`, `r`, `RA`
 - **Telescope** (`<leader>f`) → `ff`, `fg`, `fb`, `fh`, `fk`, etc.
 - **LSP / Diagnóstico** (`<leader>l`) → `ldd`, `lde`, `le`, `lg`
-- **Git** (`<leader>g`) → `gg` (LazyGit), `gs` (Gitsigns), `gb` (Blame)
+- **Git** (`<leader>g`) → `gg` (LazyGit), `gs` (Gitsigns), `gl` (Git-bug termui)
 
-> 📘 Lista completa de atalhos em [`KEYMAPS.md`](./KEYMAPS.md)
+> 📘 Lista completa de atalhos em [`KEYMAPS.md`](./KEYMAPS.md).
 
 ---
 
@@ -86,18 +103,9 @@ Documents/
 ## 🧪 Configuração rápida
 
 1. Clone este repositório em `~/.config/nvim`.
-2. Instale as dependências: `Quarto CLI`, `vim-slime`, `gh` (para git‑bug), `nvr` (opcional), `codecompanion.nvim`.
+2. Instale as dependências: `Lazygit`, `Git-bug`, `Github CLI`, `Quarto CLI`, `vim-slime`, `gh` e `nvr`.
 3. Configure o Kitty para remote control (necessário para `<leader>gl`).
 4. Inicie o LM Studio com um modelo e ajuste a URL/porta no bloco do CodeCompanion.
-
----
-
-## 📚 Documentação detalhada
-
-- **Atalhos completos e personalização:** [`KEYMAPS.md`](./KEYMAPS.md)
-- **Integração Git‑Bug offline:** [`GITBUG.md`](./GITBUG.md)
-- **CodeCompanion + LM Studio:** [`IA.md`](./IA.md)
-- **Shadow System do Quarto:** [`QUARTO_SHADOW.md`](./QUARTO_SHADOW.md)
 
 ---
 
