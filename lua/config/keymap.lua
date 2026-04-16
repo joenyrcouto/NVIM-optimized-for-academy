@@ -9,11 +9,8 @@ vim.g['quarto_is_r_mode'] = nil
 vim.g['reticulate_running'] = false
 
 local nmap = function(key, effect, desc) vim.keymap.set('n', key, effect, { silent = true, noremap = true, desc = desc }) end
-
 local vmap = function(key, effect, desc) vim.keymap.set('v', key, effect, { silent = true, noremap = true, desc = desc }) end
-
 local imap = function(key, effect, desc) vim.keymap.set('i', key, effect, { silent = true, noremap = true, desc = desc }) end
-
 local cmap = function(key, effect, desc) vim.keymap.set('c', key, effect, { silent = true, noremap = true, desc = desc }) end
 
 -- Apagar arquivo (dar um kill nele)
@@ -24,7 +21,7 @@ map('n', '<C-S-K>', function()
   }, function(choice)
     if choice == 'Sim' then
       vim.fn.delete(file)
-      vim.cmd 'bd!' -- Fecha o buffer também
+      vim.cmd 'bd!'
       vim.notify('Arquivo excluído.', vim.log.levels.INFO)
     end
   end)
@@ -105,7 +102,6 @@ end
 local slime_send_region_cmd = ':<C-u>call slime#send_op(visualmode(), 1)<CR>'
 slime_send_region_cmd = vim.api.nvim_replace_termcodes(slime_send_region_cmd, true, false, true)
 local function send_region()
-  -- if filetyps is not quarto, just send_region
   if vim.bo.filetype ~= 'quarto' or vim.b['quarto_is_r_mode'] == nil then
     vim.cmd('normal' .. slime_send_region_cmd)
     return
@@ -126,19 +122,12 @@ local function send_region()
 end
 
 -- send code with ctrl+Enter
--- just like in e.g. RStudio
--- needs kitty (or other terminal) config:
--- map shift+enter send_text all \x1b[13;2u
--- map ctrl+enter send_text all \x1b[13;5u
 nmap('<c-cr>', send_cell)
 nmap('<s-cr>', send_cell)
 imap('<c-cr>', send_cell)
 imap('<s-cr>', send_cell)
 
 --- Show R dataframe in the browser
--- might not use what you think should be your default web browser
--- because it is a plain html file, not a link
--- see https://askubuntu.com/a/864698 for places to look for
 local function show_r_table()
   local node = vim.treesitter.get_node { ignore_injections = false }
   assert(node, 'no symbol found under cursor')
@@ -173,21 +162,11 @@ local function toggle_light_dark_theme()
 end
 
 ---Is the current context a code chunk?
----@param lang string language of the code chunk
----@return boolean
 local is_code_chunk = function(lang)
   local current = require('otter.keeper').get_current_language_context()
-  if current == lang then
-    return true
-  else
-    return false
-  end
+  return current == lang
 end
 
---- Insert code chunk of given language
---- Splits current chunk if already within a chunk
---- @param lang string
---- @param curly boolean
 local insert_a_code_chunk = function(lang, curly)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<esc>', true, false, true), 'n', true)
   local keys
@@ -210,36 +189,21 @@ local insert_a_code_chunk = function(lang, curly)
 end
 
 local insert_code_chunk = function(lang) insert_a_code_chunk(lang, true) end
-
 local insert_plain_code_chunk = function(lang) insert_a_code_chunk(lang, false) end
 
 local insert_r_chunk = function() insert_code_chunk 'r' end
-
 local insert_py_chunk = function() insert_code_chunk 'python' end
-
 local insert_lua_chunk = function() insert_code_chunk 'lua' end
-
 local insert_julia_chunk = function() insert_code_chunk 'julia' end
-
 local insert_bash_chunk = function() insert_code_chunk 'bash' end
-
 local insert_ojs_chunk = function() insert_code_chunk 'ojs' end
 
 local insert_plain_r_chunk = function() insert_plain_code_chunk 'r' end
-
 local insert_plain_py_chunk = function() insert_plain_code_chunk 'python' end
-
 local insert_plain_lua_chunk = function() insert_plain_code_chunk 'lua' end
-
 local insert_plain_julia_chunk = function() insert_plain_code_chunk 'julia' end
-
 local insert_plain_bash_chunk = function() insert_plain_code_chunk 'bash' end
-
 local insert_plain_ojs_chunk = function() insert_plain_code_chunk 'ojs' end
-
---show kepbindings with whichkey
---add your own here if you want them to
---show up in the popup as well
 
 -- normal mode
 wk.add({
@@ -291,15 +255,10 @@ wk.add({
 }, { mode = 'i' })
 
 local function new_terminal(lang) vim.cmd('vsplit term://' .. lang) end
-
 local function new_terminal_python() new_terminal 'python' end
-
 local function new_terminal_r() new_terminal 'R --no-save' end
-
 local function new_terminal_ipython() new_terminal 'ipython --no-confirm-exit --no-autoindent' end
-
 local function new_terminal_julia() new_terminal 'julia' end
-
 local function new_terminal_shell() new_terminal '$SHELL' end
 
 local function get_otter_symbols_lang()
@@ -309,20 +268,16 @@ local function get_otter_symbols_lang()
   for i, l in ipairs(otterkeeper.rafts[main_nr].languages) do
     langs[i] = i .. ': ' .. l
   end
-  -- promt to choose one of langs
   local i = vim.fn.inputlist(langs)
   local lang = otterkeeper.rafts[main_nr].languages[i]
   local params = {
     textDocument = vim.lsp.util.make_text_document_params(),
-    otter = {
-      lang = lang,
-    },
+    otter = { lang = lang },
   }
-  -- don't pass a handler, as we want otter to use it's own handlers
   vim.lsp.buf_request(main_nr, ms.textDocument_documentSymbol, params, nil)
 end
 
-vim.keymap.set('n', '<leader>os', get_otter_symbols_lang, { desc = 'otter [s]ymbols' })
+vim.keymap.set('n', '<leader>ros', get_otter_symbols_lang, { desc = 'otter [s]ymbols' })
 
 local function toggle_conceal()
   local lvl = vim.o.conceallevel
@@ -333,14 +288,11 @@ local function toggle_conceal()
   end
 end
 
---- Clear image cache for snacks.nvim
---- Remove the ~/.cache/nvim/snacks/image directory
 local function clear_image_cache()
   local cache_dir = vim.fn.stdpath 'cache' .. '/snacks/image'
   if vim.fn.isdirectory(cache_dir) == 1 then vim.fn.delete(cache_dir, 'rf') end
 end
 
--- eval "$(tmux showenv -s DISPLAY)"
 -- normal mode with <leader>
 wk.add({
   {
@@ -377,16 +329,8 @@ wk.add({
     { '<leader>gc', ':GitConflictRefresh<cr>', desc = '[c]onflict' },
     { '<leader>gd', group = '[d]iff' },
     { '<leader>gs', ':Gitsigns<cr>', desc = 'git [s]igns' },
-    {
-      '<leader>gwc',
-      ":lua require('telescope').extensions.git_worktree.create_git_worktree()<cr>",
-      desc = 'worktree create',
-    },
-    {
-      '<leader>gws',
-      ":lua require('telescope').extensions.git_worktree.git_worktrees()<cr>",
-      desc = 'worktree switch',
-    },
+    { '<leader>gwc', ":lua require('telescope').extensions.git_worktree.create_git_worktree()<cr>", desc = 'worktree create' },
+    { '<leader>gws', ":lua require('telescope').extensions.git_worktree.git_worktrees()<cr>", desc = 'worktree switch' },
     { '<leader>h', group = '[h]elp / [h]ide / debug' },
     { '<leader>hc', group = '[c]onceal' },
     { '<leader>hc', toggle_conceal, desc = '[c]onceal toggle' },
@@ -396,39 +340,29 @@ wk.add({
     { '<leader>ic', clear_image_cache, desc = '[c]lear image cache' },
     { '<leader>l', group = '[l]anguage/lsp' },
     { '<leader>ld', group = '[d]iagnostics' },
-    {
-      '<leader>ldd',
-      function() vim.diagnostic.enable(false) end,
-      desc = '[d]isable',
-    },
+    { '<leader>ldd', function() vim.diagnostic.enable(false) end, desc = '[d]isable' },
     { '<leader>lde', vim.diagnostic.enable, desc = '[e]nable' },
     { '<leader>le', vim.diagnostic.open_float, desc = 'diagnostics (show hover [e]rror)' },
     { '<leader>lg', ':Neogen<cr>', desc = 'neo[g]en docstring' },
-    { '<leader>o', group = '[o]tter & c[o]de' },
-    { '<leader>oa', require('otter').activate, desc = 'otter [a]ctivate' },
-    { '<leader>oc', 'O# %%<cr>', desc = 'magic [c]omment code chunk # %%' },
-    { '<leader>od', require('otter').activate, desc = 'otter [d]eactivate' },
-
-    { '<leader>oj', insert_julia_chunk, desc = '[j]ulia code chunk' },
-    { '<leader>ol', insert_lua_chunk, desc = '[l]lua code chunk' },
-    { '<leader>oo', insert_ojs_chunk, desc = '[o]bservable js code chunk' },
-    { '<leader>op', insert_py_chunk, desc = '[p]ython code chunk' },
-    { '<leader>or', insert_r_chunk, desc = '[r] code chunk' },
-    { '<leader>ob', insert_bash_chunk, desc = '[b]ash code chunk' },
-
-    { '<leader>Oj', insert_plain_julia_chunk, desc = '[j]ulia code chunk' },
-    { '<leader>Ol', insert_plain_lua_chunk, desc = '[l]lua code chunk' },
-    { '<leader>Oo', insert_plain_ojs_chunk, desc = '[o]bservable js code chunk' },
-    { '<leader>Op', insert_plain_py_chunk, desc = '[p]ython code chunk' },
-    { '<leader>Or', insert_plain_r_chunk, desc = '[r] code chunk' },
-    { '<leader>Ob', insert_plain_bash_chunk, desc = '[b]ash code chunk' },
-
+    { '<leader>ro', group = '[o]tter & c[o]de' },
+    { '<leader>roa', require('otter').activate, desc = 'otter [a]ctivate' },
+    { '<leader>roc', 'O# %%<cr>', desc = 'magic [c]omment code chunk # %%' },
+    { '<leader>rod', require('otter').activate, desc = 'otter [d]eactivate' },
+    { '<leader>roj', insert_julia_chunk, desc = '[j]ulia code chunk' },
+    { '<leader>rol', insert_lua_chunk, desc = '[l]lua code chunk' },
+    { '<leader>roo', insert_ojs_chunk, desc = '[o]bservable js code chunk' },
+    { '<leader>rop', insert_py_chunk, desc = '[p]ython code chunk' },
+    { '<leader>ror', insert_r_chunk, desc = '[r] code chunk' },
+    { '<leader>rob', insert_bash_chunk, desc = '[b]ash code chunk' },
+    { '<leader>Ro', group = 'plain c[O]de' },
+    { '<leader>ROj', insert_plain_julia_chunk, desc = '[j]ulia code chunk' },
+    { '<leader>ROl', insert_plain_lua_chunk, desc = '[l]lua code chunk' },
+    { '<leader>ROo', insert_plain_ojs_chunk, desc = '[o]bservable js code chunk' },
+    { '<leader>ROp', insert_plain_py_chunk, desc = '[p]ython code chunk' },
+    { '<leader>ROr', insert_plain_r_chunk, desc = '[r] code chunk' },
+    { '<leader>ROb', insert_plain_bash_chunk, desc = '[b]ash code chunk' },
     { '<leader>q', group = '[q]uarto' },
-    {
-      '<leader>qE',
-      function() require('otter').export(true) end,
-      desc = '[E]xport with overwrite',
-    },
+    { '<leader>qE', function() require('otter').export(true) end, desc = '[E]xport with overwrite' },
     { '<leader>qa', ':QuartoActivate<cr>', desc = '[a]ctivate' },
     { '<leader>qe', require('otter').export, desc = '[e]xport' },
     { '<leader>qh', ':QuartoHelp ', desc = '[h]elp' },
@@ -453,33 +387,26 @@ wk.add({
   },
 }, { mode = 'n' })
 
--- [ CODECOMPANION ]
--- Menu de Ações (Principal para diagnósticos e correções)
+-- CodeCompanion
 map({ 'n', 'v' }, '<leader>ca', '<cmd>CodeCompanionActions<cr>', { desc = 'CodeCompanion: Ações' })
--- Chat Interativo (Para discussões teóricas e lógica)
 map({ 'n', 'v' }, '<leader>cc', '<cmd>CodeCompanionChat Toggle<cr>', { desc = 'CodeCompanion: Alternar Chat' })
--- Inserção Inline (O "Copilot" sob demanda para criar código)
 map({ 'n', 'v' }, '<leader>ci', '<cmd>CodeCompanion<cr>', { desc = 'CodeCompanion: Prompt Inline' })
--- Adicionar código ao Chat (Sem sair do buffer atual)
 map('v', 'ga', '<cmd>CodeCompanionChat Add<cr>', { desc = 'CodeCompanion: Adicionar ao Chat' })
 
--- [ NAVEGAÇÃO ENTRE JANELAS ]
+-- Navegação entre janelas
 map('n', '<C-h>', '<C-w>h', { desc = 'Janela à esquerda' })
 map('n', '<C-j>', '<C-w>j', { desc = 'Janela abaixo' })
 map('n', '<C-k>', '<C-w>k', { desc = 'Janela acima' })
 map('n', '<C-l>', '<C-w>l', { desc = 'Janela à direita' })
 
--- [ RENOMEAR O ARQUIVO ATUAL NO DISCO ]
+-- Renomear arquivo
 map('n', '<leader>rn', function()
   local old_name = vim.api.nvim_buf_get_name(0)
   if old_name == '' then return print 'Erro: Arquivo não salvo no disco' end
-
   local new_name = vim.fn.input('Novo nome do arquivo: ', old_name, 'file')
-
   if new_name ~= '' and new_name ~= old_name then
     local uv = vim.uv or vim.loop
     local ok, err = uv.fs_rename(old_name, new_name)
-
     if ok then
       vim.cmd('edit ' .. vim.fn.fnameescape(new_name))
       vim.cmd('bwipeout ' .. vim.fn.fnameescape(old_name))
@@ -490,7 +417,7 @@ map('n', '<leader>rn', function()
   end
 end, { desc = 'Renomear arquivo físico' })
 
--- [ NAVEGAÇÃO DE BUSCA E LIMPEZA MANUAL ]
+-- Toggle search
 local function toggle_search_clean()
   if vim.v.hlsearch == 1 then
     vim.cmd 'nohlsearch'
@@ -505,22 +432,15 @@ local function toggle_search_clean()
   end
 end
 
--- Mapeamento do '?' (Substitui a busca reversa nativa)
-map('n', '?', toggle_search_clean, {
-  desc = 'Toggle Search e Limpar Terminal',
-  silent = true,
-  nowait = true,
-})
+map('n', '?', toggle_search_clean, { desc = 'Toggle Search e Limpar Terminal', silent = true, nowait = true })
 
--- [ DIVISÃO DE TELA (SPLITS) ]
+-- Splits
 map('n', '<leader>v', '<cmd>vsp<cr>', { desc = 'Dividir Verticalmente' })
 map('n', '<leader>h', '<cmd>sp<cr>', { desc = 'Dividir Horizontalmente' })
 
--- [ TERMINAIS ]
--- Terminal horizontal (toggle)
+-- Terminais
 local term_h_buf = nil
 local term_h_win = nil
-
 map({ 'n', 't' }, '<A-h>', function()
   if term_h_win and vim.api.nvim_win_is_valid(term_h_win) then
     vim.api.nvim_win_close(term_h_win, true)
@@ -531,7 +451,6 @@ map({ 'n', 't' }, '<A-h>', function()
     term_h_win = vim.api.nvim_get_current_win()
     term_h_buf = vim.api.nvim_get_current_buf()
     vim.cmd 'startinsert'
-
     vim.api.nvim_create_autocmd('TermClose', {
       buffer = term_h_buf,
       callback = function()
@@ -543,10 +462,8 @@ map({ 'n', 't' }, '<A-h>', function()
   end
 end, { desc = 'Terminal horizontal (toggle)' })
 
--- Terminal vertical (toggle)
 local term_v_buf = nil
 local term_v_win = nil
-
 map({ 'n', 't' }, '<A-v>', function()
   if term_v_win and vim.api.nvim_win_is_valid(term_v_win) then
     vim.api.nvim_win_close(term_v_win, true)
@@ -557,7 +474,6 @@ map({ 'n', 't' }, '<A-v>', function()
     term_v_win = vim.api.nvim_get_current_win()
     term_v_buf = vim.api.nvim_get_current_buf()
     vim.cmd 'startinsert'
-
     vim.api.nvim_create_autocmd('TermClose', {
       buffer = term_v_buf,
       callback = function()
@@ -569,18 +485,13 @@ map({ 'n', 't' }, '<A-v>', function()
   end
 end, { desc = 'Terminal vertical (toggle)' })
 
--- Terminal flutuante (persistente: hide/show com <A-i>, destroy apenas com exit)
 local term_float_win = nil
 local term_float_buf = nil
-
 map({ 'n', 't' }, '<A-i>', function()
   if term_float_win and vim.api.nvim_win_is_valid(term_float_win) then
-    -- Janela está visível → esconder (fechar janela, mas manter buffer)
     vim.api.nvim_win_close(term_float_win, true)
     term_float_win = nil
-    -- buffer continua existindo em term_float_buf
   elseif term_float_buf and vim.api.nvim_buf_is_valid(term_float_buf) then
-    -- Buffer existe mas janela não → recriar janela flutuante
     local width = math.floor(vim.o.columns * 0.8)
     local height = math.floor(vim.o.lines * 0.8)
     local opts = {
@@ -597,7 +508,6 @@ map({ 'n', 't' }, '<A-i>', function()
     term_float_win = vim.api.nvim_open_win(term_float_buf, true, opts)
     vim.cmd 'startinsert'
   else
-    -- Nada existe → criar buffer e janela novos
     local width = math.floor(vim.o.columns * 0.8)
     local height = math.floor(vim.o.lines * 0.8)
     local opts = {
@@ -615,8 +525,6 @@ map({ 'n', 't' }, '<A-i>', function()
     term_float_win = vim.api.nvim_open_win(term_float_buf, true, opts)
     vim.fn.termopen(vim.o.shell, { detach = 0 })
     vim.cmd 'startinsert'
-
-    -- Quando o processo do terminal terminar (exit), resetar completamente
     vim.api.nvim_create_autocmd('TermClose', {
       buffer = term_float_buf,
       callback = function()
@@ -633,28 +541,447 @@ end, { desc = 'Terminal flutuante (hide/show, exit to destroy)' })
 -- [ CONFIGURAÇÕES ESPECÍFICAS DO OBSIDIAN ]
 -------------------------------------------------------------------
 
--- Tecla ENTER: Seguir Link
-map('n', '<CR>', function()
+local function is_obsidian_context()
+  local bufname = vim.api.nvim_buf_get_name(0)
+  if bufname ~= '' then
+    local ext = vim.fn.fnamemodify(bufname, ':e')
+    if ext ~= 'md' and ext ~= 'qmd' and ext ~= 'base' then return false end
+    local vault_path = vim.fn.expand '~/Documents/brain'
+    if bufname:find(vault_path, 1, true) then return true end
+  end
+  local cwd = vim.fn.getcwd()
+  local vault_path = vim.fn.expand '~/Documents/brain'
+  if cwd:find(vault_path, 1, true) then return true end
+  return false
+end
+
+local function ensure_in_vault()
+  if not is_obsidian_context() then
+    local vault_path = vim.fn.expand '~/Documents/brain'
+    vim.cmd('cd ' .. vault_path)
+    vim.notify('Diretório alterado para o vault: ' .. vault_path, vim.log.levels.INFO)
+  end
+end
+
+-- ATALHO: Comandos Obsidian
+vim.keymap.set('n', '<leader>oo', function()
+  ensure_in_vault()
+  local obsidian_commands = {
+    { name = 'Quick Switch (Abrir nota)', cmd = 'ObsidianQuickSwitch' },
+    { name = 'Pesquisar notas', cmd = 'ObsidianSearch' },
+    { name = 'Nova nota', cmd = 'ObsidianNew' },
+    { name = 'Nota de hoje', cmd = 'ObsidianToday' },
+    { name = 'Nota de ontem', cmd = 'ObsidianYesterday' },
+    { name = 'Notas diárias', cmd = 'ObsidianDailies' },
+    { name = 'Backlinks', cmd = 'ObsidianBacklinks' },
+    { name = 'Tags', cmd = 'ObsidianTags' },
+    { name = 'Colar imagem', cmd = 'ObsidianPasteImg' },
+    { name = 'Renomear nota', cmd = 'ObsidianRename' },
+    { name = 'Seguir link', cmd = 'ObsidianFollowLink' },
+    { name = 'Template', cmd = 'ObsidianTemplate' },
+    { name = 'Abrir no navegador', cmd = 'ObsidianOpen' },
+    { name = 'Workspace', cmd = 'ObsidianWorkspace' },
+  }
+  local pickers = require 'telescope.pickers'
+  local finders = require 'telescope.finders'
+  local conf = require('telescope.config').values
+  local actions = require 'telescope.actions'
+  local action_state = require 'telescope.actions.state'
+  pickers
+    .new({}, {
+      prompt_title = 'Comandos Obsidian',
+      finder = finders.new_table {
+        results = obsidian_commands,
+        entry_maker = function(entry) return { value = entry, display = entry.name, ordinal = entry.name } end,
+      },
+      sorter = conf.generic_sorter {},
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          actions.close(prompt_bufnr)
+          local selection = action_state.get_selected_entry()
+          if selection then vim.cmd(selection.value.cmd) end
+        end)
+        return true
+      end,
+    })
+    :find()
+end, { desc = 'Obsidian: Comandos (Telescope)' })
+
+-- Templates por pasta
+local folder_template_map = {
+  ['00-rápidas'] = '00-rápidas-tlp.md',
+  ['01-notelm'] = '01-notelm-tlp.md',
+  ['02-zettel'] = '02-zettel-tlp.md',
+  ['03-MOC'] = '03-MOC-tlp.md',
+  ['99-brutos/biblioteca'] = '99-Acervo-tlp.md',
+  ['99-brutos/tracking'] = '99-tracking-tlp.md',
+  ['99-brutos/exercícios'] = '99-exercícios-tlp.md',
+}
+
+local function translate_template(content, title)
+  local now = os.date
+  local date = now '%Y-%m-%d'
+  local time = now '%H:%M'
+  local datetime = date .. ' ' .. time
+  local datetime_t = date .. 'T' .. time
+  local patterns = {
+    { '<%% tp%.date%.now%("YYYY%-MM%-DD HH:mm"%) %%>', datetime },
+    { '<%% tp%.date%.now%("YYYY%-MM%-DDTHH:mm"%) %%>', datetime_t },
+    { '<%% tp%.date%.now%("YYYY%-MM%-DD"%) %%>', date },
+    { '<%% tp%.file%.title %%>', title },
+    { '{{title}}', title },
+    { '{{date}}', date },
+    { '{{time}}', time },
+  }
+  local translated = content
+  for _, pat in ipairs(patterns) do
+    translated = translated:gsub(pat[1], pat[2])
+  end
+  return translated
+end
+
+local function get_vault_directories(vault_path)
+  local dirs = {}
+  local function scan(current_path, depth)
+    local items = vim.fn.readdir(current_path)
+    for _, item in ipairs(items) do
+      local full = current_path .. '/' .. item
+      if vim.fn.isdirectory(full) == 1 then
+        if not item:match '^%.' then
+          table.insert(dirs, { path = full, depth = depth })
+          scan(full, depth + 1)
+        end
+      end
+    end
+  end
+  scan(vault_path, 1)
+  table.sort(dirs, function(a, b)
+    if a.depth == b.depth then
+      return a.path < b.path
+    else
+      return a.depth < b.depth
+    end
+  end)
+  local relative_dirs = {}
+  for _, d in ipairs(dirs) do
+    local rel = d.path:sub(#vault_path + 2)
+    table.insert(relative_dirs, rel)
+  end
+  return relative_dirs
+end
+
+-- NOVA NOTA COM SELEÇÃO DE DIRETÓRIO (aceita pré-seleção via opts)
+local function new_obsidian_note_with_directory_telescope(opts)
+  opts = opts or {}
+  ensure_in_vault()
+  local vault_path = vim.fn.expand '~/Documents/brain'
+  local template_dir = vault_path .. '/99-brutos/templates/'
+  local directories = get_vault_directories(vault_path)
+  table.insert(directories, 1, '')
+
+  local pickers = require 'telescope.pickers'
+  local finders = require 'telescope.finders'
+  local conf = require('telescope.config').values
+  local actions = require 'telescope.actions'
+  local action_state = require 'telescope.actions.state'
+
+  pickers
+    .new({}, {
+      prompt_title = 'Escolha o diretório para a nova nota',
+      finder = finders.new_table {
+        results = directories,
+        entry_maker = function(dir)
+          local display = dir == '' and '[raiz do vault]' or dir
+          return { value = dir, display = display, ordinal = display }
+        end,
+      },
+      sorter = conf.generic_sorter {},
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          actions.close(prompt_bufnr)
+          local selection = action_state.get_selected_entry()
+          if not selection then return end
+          local chosen_dir = opts.default_dir or selection.value
+          local default_name = opts.default_name or ''
+          vim.ui.input({
+            prompt = 'Nome da nota (sem extensão): ',
+            default = default_name,
+          }, function(filename)
+            if not filename or filename == '' then return end
+            local rel_path = chosen_dir == '' and filename or chosen_dir .. '/' .. filename
+            if not rel_path:match '%.%w+$' then rel_path = rel_path .. '.md' end
+            local full_path = vault_path .. '/' .. rel_path
+            local title = vim.fn.fnamemodify(filename, ':r')
+
+            local template_name = nil
+            local clean_rel = rel_path:gsub('^/', '')
+            for folder, tpl in pairs(folder_template_map) do
+              if clean_rel == folder or vim.startswith(clean_rel, folder .. '/') then
+                template_name = tpl
+                break
+              end
+            end
+
+            local content
+            if template_name then
+              local f = io.open(template_dir .. template_name, 'r')
+              if f then
+                content = f:read '*a'
+                f:close()
+                content = translate_template(content, title)
+              else
+                content = string.format('---\ntitle: %s\ndate: %s %s\n---\n', title, os.date '%Y-%m-%d', os.date '%H:%M')
+              end
+            else
+              content = string.format('---\ntitle: %s\ndate: %s %s\n---\n', title, os.date '%Y-%m-%d', os.date '%H:%M')
+            end
+
+            if vim.fn.filereadable(full_path) == 1 then
+              vim.ui.select({ 'Sim', 'Não' }, { prompt = 'O arquivo já existe. Deseja sobrescrevê-lo?' }, function(choice)
+                if choice == 'Sim' then
+                  vim.fn.mkdir(vim.fn.fnamemodify(full_path, ':h'), 'p')
+                  local file = io.open(full_path, 'w')
+                  if file then
+                    file:write(content)
+                    file:close()
+                    vim.cmd('edit ' .. vim.fn.fnameescape(full_path))
+                  end
+                end
+              end)
+            else
+              vim.fn.mkdir(vim.fn.fnamemodify(full_path, ':h'), 'p')
+              local file = io.open(full_path, 'w')
+              if file then
+                file:write(content)
+                file:close()
+                vim.cmd('edit ' .. vim.fn.fnameescape(full_path))
+              end
+            end
+          end)
+        end)
+        return true
+      end,
+    })
+    :find()
+end
+
+-- Extensões suportadas
+local obsidian_extensions = { 'excalidraw', 'md', 'qmd', 'js', 'base' }
+
+-- QUICK SWITCH PERSONALIZADO
+local function obsidian_quick_switch_telescope()
+  ensure_in_vault()
+  local vault_path = vim.fn.expand '~/Documents/brain'
+  local glob_pattern = '**/*.{' .. table.concat(obsidian_extensions, ',') .. '}'
+  local cmd = {
+    'rg',
+    '--files',
+    '--iglob',
+    glob_pattern,
+    '--iglob',
+    '!**/.*',
+    '--color',
+    'never',
+    '--no-heading',
+    '--with-filename',
+    '--line-number',
+    '--column',
+    vault_path,
+  }
+  local pickers = require 'telescope.pickers'
+  local finders = require 'telescope.finders'
+  local conf = require('telescope.config').values
+  local actions = require 'telescope.actions'
+  local action_state = require 'telescope.actions.state'
+  local original_buf = vim.api.nvim_get_current_buf()
+  local cursor_pos = vim.api.nvim_win_get_cursor(0)
+
+  pickers
+    .new({}, {
+      prompt_title = 'Notes | <CR> confirm | <C-l> insert link',
+      finder = finders.new_oneshot_job(cmd, {
+        entry_maker = function(line)
+          local full_path = line:match '^([^:]+)'
+          if not full_path then return nil end
+          local rel_path = full_path:sub(#vault_path + 2)
+          local name_with_ext = vim.fn.fnamemodify(rel_path, ':t')
+          local name_base = vim.fn.fnamemodify(rel_path, ':t:r')
+          local ext = vim.fn.fnamemodify(rel_path, ':e')
+          local link_name = (ext == 'md' or ext == 'qmd') and name_base or name_with_ext
+          return { value = full_path, display = rel_path, ordinal = rel_path, link_name = link_name }
+        end,
+      }),
+      sorter = conf.generic_sorter {},
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          actions.close(prompt_bufnr)
+          local selection = action_state.get_selected_entry()
+          if selection then vim.cmd('edit ' .. vim.fn.fnameescape(selection.value)) end
+        end)
+        local function insert_link()
+          local selection = action_state.get_selected_entry()
+          if not selection then return end
+          actions.close(prompt_bufnr)
+          local link_text = '[[' .. selection.link_name .. ']]'
+          local row = cursor_pos[1] - 1
+          local col = cursor_pos[2]
+          vim.api.nvim_buf_set_text(original_buf, row, col, row, col, { link_text })
+          vim.notify('Link inserido: ' .. link_text, vim.log.levels.INFO)
+        end
+        map('i', '<C-l>', insert_link)
+        map('n', '<C-l>', insert_link)
+        return true
+      end,
+    })
+    :find()
+end
+
+vim.keymap.set('n', '<leader>of', obsidian_quick_switch_telescope, { desc = 'Obsidian: Quick Switch (Telescope)' })
+
+-- Demais atalhos Obsidian
+vim.keymap.set('n', '<leader>os', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianSearch'
+end, { desc = 'Obsidian: Pesquisar notas' })
+vim.keymap.set('n', '<leader>on', new_obsidian_note_with_directory_telescope, { desc = 'Obsidian: Nova nota (escolher diretório)' })
+vim.keymap.set('n', '<leader>ot', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianToday'
+end, { desc = 'Obsidian: Nota de hoje' })
+vim.keymap.set('n', '<leader>oy', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianYesterday'
+end, { desc = 'Obsidian: Nota de ontem' })
+vim.keymap.set('n', '<leader>od', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianDailies'
+end, { desc = 'Obsidian: Notas diárias' })
+vim.keymap.set('n', '<leader>ob', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianBacklinks'
+end, { desc = 'Obsidian: Backlinks' })
+vim.keymap.set('n', '<leader>og', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianTags'
+end, { desc = 'Obsidian: Tags' })
+vim.keymap.set('n', '<leader>oi', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianPasteImg'
+end, { desc = 'Obsidian: Colar imagem' })
+vim.keymap.set('n', '<leader>or', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianRename'
+end, { desc = 'Obsidian: Renomear nota' })
+vim.keymap.set('n', '<leader>op', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianTemplate'
+end, { desc = 'Obsidian: Template' })
+vim.keymap.set('n', '<leader>ow', function()
+  ensure_in_vault()
+  vim.cmd 'ObsidianWorkspace'
+end, { desc = 'Obsidian: Workspace' })
+vim.keymap.set('n', '<leader>ov', function() vim.cmd('cd ' .. vim.fn.expand '~/Documents/brain') end, { desc = 'Obsidian: Abrir caminho do vault' })
+
+-- NOVA FUNÇÃO PARA SEGUIR LINKS (com suporte a criação)
+local function find_note_by_link(link)
+  local vault_path = vim.fn.expand '~/Documents/brain'
+  -- Remove âncoras
+  local clean_link = link:match '([^#]+)' or link
+  -- Tenta encontrar arquivo com extensões suportadas (busca recursiva)
+  for _, ext in ipairs(obsidian_extensions) do
+    local pattern = vault_path .. '/**/' .. clean_link .. '.' .. ext
+    local files = vim.fn.glob(pattern, false, true)
+    if #files > 0 then return files[1], ext end
+  end
+  -- Tenta também se o link já inclui extensão
+  if clean_link:match '%.%w+$' then
+    local full = vault_path .. '/' .. clean_link
+    if vim.fn.filereadable(full) == 1 then
+      local ext = vim.fn.fnamemodify(full, ':e')
+      return full, ext
+    end
+  end
+  return nil, nil
+end
+
+vim.keymap.set('n', '<CR>', function()
+  if not is_obsidian_context() then return '<CR>' end
+
+  -- Tenta primeiro os métodos nativos do obsidian.nvim
   local ok, obsidian = pcall(require, 'obsidian')
   if ok then
-    -- Tenta seguir o link; se falhar, usa o comportamento normal do <CR>
-    local success = pcall(vim.cmd, 'ObsidianFollowLink')
-    if success then return '' end
+    local client = obsidian.get_client()
+    if client and pcall(client.follow_link, client) then return '' end
   end
-  return '<CR>'
-end, { expr = true, desc = 'Obsidian: Seguir Link' })
+  if pcall(vim.cmd, 'ObsidianFollowLink') then return '' end
 
--- Tecla Espaço + Shift + R: Renomear Inteligente
-map('n', '<leader>R', function()
-  if vim.bo.filetype == 'markdown' or vim.bo.filetype == 'quarto' then
-    vim.cmd 'ObsidianRename'
-  else
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<leader>rn', true, false, true), 'm', true)
+  -- Fallback manual
+  local line = vim.api.nvim_get_current_line()
+  local link = line:match '%[%[([^%]]+)%]%]' or line:match '%[.-%]%(([^%)]+)%)'
+  if not link then return '<CR>' end
+
+  local file_path, ext = find_note_by_link(link)
+  if file_path then
+    if ext == 'md' or ext == 'qmd' then
+      vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
+    else
+      vim.cmd('tabnew ' .. vim.fn.fnameescape(file_path))
+    end
+    return ''
   end
-end, { desc = 'Renomear Inteligente' })
 
-map('n', '<leader>oi', '<cmd>ObsidianPasteImg<CR>', { desc = 'Colar Imagem' })
-map('n', '<leader>ob', '<cmd>ObsidianBacklinks<CR>', { desc = 'Ver Backlinks' })
+  -- Arquivo não existe: pergunta se quer criar
+  vim.ui.select({ 'Sim', 'Não' }, {
+    prompt = 'Arquivo "' .. link .. '" não existe. Deseja criá-lo?',
+  }, function(choice)
+    if choice == 'Sim' then
+      -- Extrai diretório e nome do link
+      local dir, name = link:match '^(.*)/([^/]+)$'
+      local opts = {}
+      if dir then
+        opts.default_dir = dir
+        opts.default_name = name
+      else
+        opts.default_name = link
+      end
+      new_obsidian_note_with_directory_telescope(opts)
+    end
+  end)
+  return ''
+end, { expr = true, desc = 'Obsidian: Seguir Link (com criação)' })
+
+-- Atalhos visuais
+vim.keymap.set('v', '<leader>ol', function()
+  if is_obsidian_context() then vim.cmd 'ObsidianLink' end
+end, { desc = 'Obsidian: Criar link' })
+vim.keymap.set('v', '<leader>ox', function()
+  if is_obsidian_context() then vim.cmd 'ObsidianExtractNote' end
+end, { desc = 'Obsidian: Extrair para nova nota' })
+
+vim.api.nvim_create_user_command('ObsidianVault', function()
+  vim.cmd('cd ' .. vim.fn.expand '~/Documents/brain')
+  vim.cmd 'ObsidianQuickSwitch'
+end, { desc = 'Abrir vault do Obsidian' })
+
+-- Which-key
+wk.add {
+  { '<leader>o', group = '[o]bsidian' },
+  { '<leader>oo', desc = 'Comandos (Telescope)' },
+  { '<leader>os', desc = 'Pesquisar' },
+  { '<leader>on', desc = 'Nova nota' },
+  { '<leader>ot', desc = 'Hoje' },
+  { '<leader>oy', desc = 'Ontem' },
+  { '<leader>od', desc = 'Diárias' },
+  { '<leader>ob', desc = 'Backlinks' },
+  { '<leader>og', desc = 'Tags' },
+  { '<leader>oi', desc = 'Colar imagem' },
+  { '<leader>or', desc = 'Renomear' },
+  { '<leader>op', desc = 'Template' },
+  { '<leader>ow', desc = 'Workspace' },
+  { '<leader>ov', desc = 'Abrir vault' },
+  { '<leader>t', group = '[t]mp Tools/Quarto' },
+  { '<leader>to', desc = 'Obsidian Quick Switch' },
+}
 
 -- ==========================================
 -- INTEGRAÇÃO GIT-BUG (ATUALIZADA - BRIDGE AUTH)

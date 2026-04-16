@@ -15,7 +15,7 @@ require 'config.autocommands'
 require 'config.keymap'
 -- require 'config.lazy'
 require 'config.redir'
-require 'quarto_autocmds'
+require 'quarto_tmp'
 
 -- Garante o uso do Treesitter para indentação e dobras
 vim.api.nvim_create_autocmd('FileType', {
@@ -123,6 +123,10 @@ return {
   {
     'epwalsh/obsidian.nvim',
     version = '*',
+    event = {
+      'BufReadPre ' .. vim.fn.expand '~' .. '~/Documents/brain**',
+      'BufNewFile ' .. vim.fn.expand '~' .. '~/Documents/brain/**',
+    },
     lazy = false,
     dependencies = { 'nvim-lua/plenary.nvim' },
     opts = {
@@ -132,10 +136,20 @@ return {
         date_format = '%Y-%m-%d',
         time_format = '%H-%M',
       },
-      extensions = { '.md', '.qmd' },
+      -- NOVO: Mapeamento de pastas para templates automáticos
+      note_template = {
+        ['00-rápidas'] = '00-rápidas-tlp.md',
+        ['01-notelm'] = '01-notelm-tlp.md',
+        ['02-zettel'] = '02-zettel-tlp.md',
+        ['03-MOC'] = '03-MOC-tlp.md',
+        ['99-brutos/biblioteca'] = '99-Acervo-tlp.md',
+        ['99-brutos/tracking'] = '99-tracking-tlp.md',
+        ['99-brutos/exercícios'] = '99-exercícios-tlp.md',
+      },
+      extensions = { '.md', '.qmd', '.base' },
       completion = { nvim_cmp = false, min_chars = 2 },
       attachments = { folder = '99-brutos' },
-      daily_notes = { folder = '00-rápidas', date_format = '%Y-%m-%d' },
+      daily_notes = { folder = '00-rápidas', date_format = '%Y-%m-%d', template = '00-rápidas-tlp.md' },
       legacy_commands = false,
       ui = { enable = false },
     },
@@ -150,6 +164,7 @@ return {
       obsidian_server_address = 'http://localhost:27123', -- Verifique se o HTTP (sem SSL) está ativo no Obsidian
       scroll_sync = false, -- Deixe false a menos que use a versão modificada do REST API
       warnings = true,
+      extensions = { '.md', '.qmd', '.base' },
     },
     config = function(_, opts)
       -- Só ativa o bridge se o arquivo atual estiver dentro do seu Vault

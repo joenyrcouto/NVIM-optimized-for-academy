@@ -19,7 +19,6 @@ end
 --  Gerenciamento do YAML (frontmatter) do buffer
 -- =========================================================================
 
--- Verifica se a linha está dentro de um bloco de código (```...```)
 local function inside_code_block(lines, idx)
   local in_block = false
   for i = 1, idx do
@@ -30,10 +29,8 @@ end
 
 local function get_yaml_range(bufnr)
   if not is_supported_extension(bufnr) then return nil end
-
   local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
   if #lines == 0 then return nil end
-
   local start = nil
   for i = 1, #lines do
     if not inside_code_block(lines, i) then
@@ -44,7 +41,6 @@ local function get_yaml_range(bufnr)
     end
   end
   if not start then return nil end
-
   for i = start + 1, #lines do
     if not inside_code_block(lines, i) then
       if lines[i]:match '^%s*---%s*$' then return start, i end
@@ -55,10 +51,8 @@ end
 
 local function parse_yaml_config(bufnr)
   if not is_supported_extension(bufnr) then return {} end
-
   local start, finish = get_yaml_range(bufnr)
   if not start then return {} end
-
   local lines = api.nvim_buf_get_lines(bufnr, start, finish - 1, false)
   local config = {}
   for _, line in ipairs(lines) do
@@ -85,10 +79,8 @@ end
 
 local function update_yaml_config(bufnr, updates)
   if not is_supported_extension(bufnr) then return end
-
   local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local start, finish = get_yaml_range(bufnr)
-
   if not start then
     local new_lines = { '---' }
     for k, v in pairs(updates) do
@@ -104,18 +96,15 @@ local function update_yaml_config(bufnr, updates)
     api.nvim_buf_set_lines(bufnr, 0, 0, false, new_lines)
     return
   end
-
   local yaml_lines = {}
   for i = start + 1, finish - 1 do
     table.insert(yaml_lines, lines[i])
   end
-
   local key_to_index = {}
   for idx, line in ipairs(yaml_lines) do
     local key = line:match '^([%w_]+):'
     if key then key_to_index[key] = idx end
   end
-
   for k, v in pairs(updates) do
     local new_line
     if type(v) == 'boolean' then
@@ -125,20 +114,17 @@ local function update_yaml_config(bufnr, updates)
     else
       new_line = k .. ': ' .. tostring(v)
     end
-
     if key_to_index[k] then
       yaml_lines[key_to_index[k]] = new_line
     else
       table.insert(yaml_lines, new_line)
     end
   end
-
   local new_block = { '---' }
   for _, line in ipairs(yaml_lines) do
     table.insert(new_block, line)
   end
   table.insert(new_block, '---')
-
   api.nvim_buf_set_lines(bufnr, start - 1, finish, false, new_block)
 end
 
@@ -149,32 +135,28 @@ local buffer_config_cache = {}
 
 local default_config = {
   quarto_id = nil,
-  quarto_comp_nativa = false,
+  quarto_comp_nativa = false, -- "Push de arquivos para local físico"
   quarto_modo_escrita = false,
-  quarto_usar_local_fisico = true, -- padrão: usa local físico se não houver ID
-  quarto_ignorar_ativos = true, -- padrão: ignora ativos se não houver ID
+  quarto_usar_local_fisico = true, -- true = local físico, false = usar tmp
+  quarto_ignorar_ativos = true,
+  quarto_modo_rapido = false, -- Modo Rápido (sem execução de código)
   quarto_gerais = {},
   quarto_extensoes = {},
 }
 
 local function get_buffer_config(bufnr)
   if buffer_config_cache[bufnr] then return buffer_config_cache[bufnr] end
-
   if not is_supported_extension(bufnr) then
     local config = vim.deepcopy(default_config)
     buffer_config_cache[bufnr] = config
     return config
   end
-
   local yaml = parse_yaml_config(bufnr)
   local config = vim.tbl_deep_extend('force', {}, default_config, yaml)
-
-  -- Se não há ID no YAML, força modo local e ignora ativos (comportamento padrão)
   if not config.quarto_id then
     config.quarto_usar_local_fisico = true
     config.quarto_ignorar_ativos = true
   end
-
   local gerais_set = {}
   for _, name in ipairs(config.quarto_gerais or {}) do
     gerais_set[name] = true
@@ -191,7 +173,6 @@ end
 
 local function save_buffer_config(bufnr)
   if not is_supported_extension(bufnr) then return end
-
   local config = buffer_config_cache[bufnr]
   if not config then return end
   local updates = {
@@ -200,6 +181,7 @@ local function save_buffer_config(bufnr)
     quarto_modo_escrita = config.quarto_modo_escrita,
     quarto_usar_local_fisico = config.quarto_usar_local_fisico,
     quarto_ignorar_ativos = config.quarto_ignorar_ativos,
+    quarto_modo_rapido = config.quarto_modo_rapido,
     quarto_gerais = vim.tbl_keys(config.quarto_gerais),
     quarto_extensoes = vim.tbl_keys(config.quarto_extensoes),
   }
@@ -208,7 +190,6 @@ end
 
 local function ensure_buffer_id(bufnr, force_create)
   if not is_supported_extension(bufnr) then return fn.sha256(tostring(os.time()) .. tostring(bufnr)):sub(1, 8) end
-
   local config = get_buffer_config(bufnr)
   if not config.quarto_id and force_create then
     local buf_name = api.nvim_buf_get_name(bufnr)
@@ -234,21 +215,17 @@ local function prompt_shadow_setup(bufnr, reason)
     'Question'
   )
   if choice == 1 then
-    -- Cria ID e salva
     ensure_buffer_id(bufnr, true)
-    -- Após criar ID, recarrega a config do cache para refletir os novos valores
     buffer_config_cache[bufnr] = nil
     local config = get_buffer_config(bufnr)
-    config.quarto_usar_local_fisico = false -- com shadow, padrão é usar shadow
-    config.quarto_ignorar_ativos = false -- com shadow, por padrão não ignora
+    config.quarto_usar_local_fisico = false
+    config.quarto_ignorar_ativos = false
     save_buffer_config(bufnr)
     return true
   else
-    -- Usuário recusou: mantém modo local
     local config = get_buffer_config(bufnr)
     config.quarto_usar_local_fisico = true
     config.quarto_ignorar_ativos = true
-    -- Não salva no YAML, apenas em memória
     return false
   end
 end
@@ -274,10 +251,8 @@ local function open_menu(title, lines, width_offset)
   }
   local win = api.nvim_open_win(buf, true, opts)
   vim.wo[win].winhl = 'Normal:Normal,FloatBorder:FloatBorder'
-
   vim.keymap.set('n', 'q', '<cmd>q<CR>', { buffer = buf, silent = true, nowait = true })
   vim.keymap.set('n', '<Esc>', '<cmd>q<CR>', { buffer = buf, silent = true, nowait = true })
-
   return buf, win
 end
 
@@ -301,13 +276,18 @@ local function open_log_view(path)
 end
 
 -- =========================================================================
+--  Abertura de arquivos com aplicativo padrão do sistema
+-- =========================================================================
+local function open_with_default_app(file_path) fn.jobstart({ 'xdg-open', file_path }, { detach = true }) end
+
+-- =========================================================================
 --  Shadow Sync
 -- =========================================================================
 local function get_shadow_info(bufnr)
   local buf_name = api.nvim_buf_get_name(bufnr)
   if buf_name == '' then return nil end
   local name = fn.fnamemodify(buf_name, ':t')
-  local id = ensure_buffer_id(bufnr, false) -- não força criação aqui
+  local id = ensure_buffer_id(bufnr, false)
   if not id then return nil end
   local work_dir = shadow_root .. '/' .. id
   fn.mkdir(work_dir, 'p')
@@ -316,7 +296,6 @@ end
 
 local function update_shadow_from_buffer(bufnr)
   if not is_supported_extension(bufnr) then return nil end
-
   local info = get_shadow_info(bufnr)
   if not info then return nil end
   local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
@@ -352,27 +331,30 @@ local function sync_assets(target_dir, config)
 end
 
 -- =========================================================================
---  Extração de Blocos
+--  Extração de Blocos (versão melhorada para detectar chaves)
 -- =========================================================================
-local function get_code_blocks(bufnr)
+local function get_all_blocks(bufnr)
   local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local blocks, in_block, block_start, block_lang, block_lines, eval_enabled = {}, false, 0, '', {}, true
+  local blocks = {}
+  local in_block, block_start, block_lang, has_braces = false, 0, '', false
   for i, line in ipairs(lines) do
     if not in_block then
-      local lang = line:match '^```{%s*([^%s,}]+)'
-      if lang then
-        in_block, block_start, block_lang, block_lines, eval_enabled = true, i, lang, {}, true
+      local lang_braces = line:match '^```{%s*([^%s,}]+)'
+      local lang_simple = line:match '^```(%a+)$'
+      if lang_braces then
+        in_block, block_start, block_lang, has_braces = true, i, lang_braces, true
+      elseif lang_simple then
+        in_block, block_start, block_lang, has_braces = true, i, lang_simple, false
       end
     else
       if line:match '^```$' then
-        table.insert(blocks, { start = block_start, finish = i, lang = block_lang, lines = block_lines, eval = eval_enabled })
+        table.insert(blocks, {
+          start = block_start,
+          finish = i,
+          lang = block_lang,
+          has_braces = has_braces,
+        })
         in_block = false
-      else
-        if line:match '^#|%s*eval:%s*false' then
-          eval_enabled = false
-        elseif not line:match '^#|' then
-          table.insert(block_lines, line)
-        end
       end
     end
   end
@@ -380,9 +362,74 @@ local function get_code_blocks(bufnr)
 end
 
 -- =========================================================================
+--  Manipulação de Blocos: alternar entre ```{lang} e ```lang
+-- =========================================================================
+local function toggle_block_braces(bufnr, block_idx)
+  local blocks = get_all_blocks(bufnr)
+  if block_idx < 1 or block_idx > #blocks then
+    vim.notify('Bloco inválido.', vim.log.levels.ERROR)
+    return
+  end
+  local blk = blocks[block_idx]
+  local new_line
+  if blk.has_braces then
+    new_line = '```' .. blk.lang
+  else
+    new_line = '```{' .. blk.lang .. '}'
+  end
+  api.nvim_buf_set_lines(bufnr, blk.start - 1, blk.start, false, { new_line })
+  vim.notify(string.format('Bloco %d alternado para %s', block_idx, blk.has_braces and 'sem chaves' or 'com chaves'), vim.log.levels.INFO)
+end
+
+local function remove_block(bufnr, block_idx)
+  local blocks = get_all_blocks(bufnr)
+  if block_idx < 1 or block_idx > #blocks then
+    vim.notify('Bloco inválido.', vim.log.levels.ERROR)
+    return
+  end
+  local blk = blocks[block_idx]
+  api.nvim_buf_set_lines(bufnr, blk.start - 1, blk.finish, false, {})
+  vim.notify(string.format('Bloco %d removido.', block_idx), vim.log.levels.INFO)
+end
+
+local function copy_block_content(bufnr, block_idx)
+  local blocks = get_all_blocks(bufnr)
+  if block_idx < 1 or block_idx > #blocks then
+    vim.notify('Bloco inválido.', vim.log.levels.ERROR)
+    return
+  end
+  local blk = blocks[block_idx]
+  local lines = api.nvim_buf_get_lines(bufnr, blk.start, blk.finish - 1, false)
+  local content = table.concat(lines, '\n')
+  fn.setreg('+', content)
+  vim.notify(string.format('Conteúdo do bloco %d copiado.', block_idx), vim.log.levels.INFO)
+  return content
+end
+
+local function send_block_to_repl(bufnr, block_idx)
+  local content = copy_block_content(bufnr, block_idx)
+  if not content then return end
+  local slime_ok, slime = pcall(require, 'slime')
+  if slime_ok then
+    slime.send(content)
+    vim.notify('Bloco enviado para REPL.', vim.log.levels.INFO)
+  else
+    vim.notify('vim-slime não encontrado.', vim.log.levels.WARN)
+  end
+end
+
+-- =========================================================================
 --  Preview State
 -- =========================================================================
-local preview_state = { job = nil, port = 4445, url = nil, mode = nil, bufnr = nil, config = nil, browser_opened = false }
+local preview_state = {
+  job = nil,
+  port = 4445,
+  url = nil,
+  mode = nil,
+  bufnr = nil,
+  config = nil,
+  browser_opened = false,
+}
 
 local function stop_preview()
   if preview_state.job then
@@ -394,7 +441,7 @@ local function stop_preview()
   preview_state.browser_opened = false
 end
 
-local function start_preview(shadow_info, file_path, fmt, compile, config)
+local function start_preview(shadow_info, file_path, fmt, config)
   stop_preview()
 
   local cmd_parts = {
@@ -408,17 +455,17 @@ local function start_preview(shadow_info, file_path, fmt, compile, config)
     '--no-browser',
   }
 
-  if not compile then table.insert(cmd_parts, '--no-execute') end
+  if config.quarto_modo_rapido then table.insert(cmd_parts, '--no-execute') end
 
   local cmd = table.concat(cmd_parts, ' ')
-  preview_state.mode = compile and 'compile' or 'fast'
+  preview_state.mode = 'compile'
   preview_state.bufnr = api.nvim_get_current_buf()
   preview_state.config = config
 
   local log_path = shadow_info.dir .. '/preview.log'
   fn.writefile({ '=== Preview Log === ' .. os.date(), '' }, log_path)
 
-  vim.notify('Iniciando preview (' .. preview_state.mode .. ')...', vim.log.levels.INFO)
+  vim.notify('Iniciando preview (' .. fmt:upper() .. ')...', vim.log.levels.INFO)
 
   local function process_output_for_url(data)
     if not data then return end
@@ -429,7 +476,7 @@ local function start_preview(shadow_info, file_path, fmt, compile, config)
         preview_state.url = url
         preview_state.browser_opened = true
         vim.schedule(function()
-          fn.jobstart { 'xdg-open', url }
+          open_with_default_app(url)
           vim.notify('Preview disponível em ' .. url, vim.log.levels.INFO)
         end)
       end
@@ -479,6 +526,8 @@ local function start_preview(shadow_info, file_path, fmt, compile, config)
   })
 end
 
+-- Debounce para evitar spam de "Preview atualizado"
+local refresh_timer = nil
 local function refresh_preview()
   if not preview_state.job then
     vim.notify('Nenhum preview ativo.', vim.log.levels.WARN)
@@ -489,11 +538,17 @@ local function refresh_preview()
     vim.notify('Buffer original não disponível.', vim.log.levels.ERROR)
     return
   end
-  local info = update_shadow_from_buffer(bufnr)
-  if info then
-    fn.system('touch ' .. fn.shellescape(info.path))
-    vim.notify('Preview atualizado.', vim.log.levels.INFO)
+  local config = get_buffer_config(bufnr)
+  if not config.quarto_modo_escrita then return end
+  if refresh_timer then
+    refresh_timer:stop()
+    refresh_timer:close()
   end
+  refresh_timer = vim.defer_fn(function()
+    local info = update_shadow_from_buffer(bufnr)
+    if info then fn.system('touch ' .. fn.shellescape(info.path)) end
+    refresh_timer = nil
+  end, 500)
 end
 
 -- =========================================================================
@@ -518,63 +573,71 @@ local function quarto_handler(args)
 
   if #fargs == 0 or flag == '-h' then
     open_menu('Quarto - Ajuda', {
-      ' :Quarto -p [-c] [-s] [fmt]   → Preview (rápido/compilado)',
-      ' :Quarto -r                  → Atualizar preview',
-      ' :Quarto -k                  → Parar preview',
-      ' :Quarto -c [-s] [fmt]       → Renderizar final',
-      ' :Quarto -b                  → Executar bloco',
-      ' :Quarto -l                  → Logs',
-      ' :Quarto -m                  → Configurações',
+      ' :Quarto -p [fmt]      → Preview (pdf ou html)',
+      ' :Quarto -r            → Atualizar preview',
+      ' :Quarto -k            → Parar preview',
+      ' :Quarto -c [fmt]      → Renderizar final',
+      ' :Quarto -b            → Gerenciar blocos',
+      ' :Quarto -l            → Logs',
+      ' :Quarto -m            → Configurações',
       '',
       ' q para fechar',
     }, 75)
     return
   end
 
-  -- Verifica se precisa perguntar sobre shadow para comandos que dependem dele
   local needs_shadow = (flag == '-p' or flag == '-c' or flag == '-m')
   local has_id = config.quarto_id ~= nil
 
   if needs_shadow and not has_id then
     local reason = (flag == '-p' and 'preview') or (flag == '-c' and 'renderização') or 'configuração'
     local accepted = prompt_shadow_setup(bufnr, reason)
-    -- Recarrega config após possível criação
     config = get_buffer_config(bufnr)
     has_id = config.quarto_id ~= nil
     if not accepted then
-      -- Usuário recusou: para -m, menu simplificado; para -p/-c, prossegue com local físico
       if flag == '-m' then
-        -- Menu apenas com Modo Escrita (sem opções de shadow)
         local lines = {
           ' === Configurações (Modo Local) ===',
           '',
           ' 1. Modo Escrita: ' .. tostring(config.quarto_modo_escrita),
+          ' 2. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido),
           '',
-          ' (Sem shadow ativo - apenas modo escrita ajustável)',
+          ' (Sem shadow ativo)',
           '',
-          ' Pressione 1 para alternar, q para sair',
+          ' Pressione 1/2 para alternar, q para sair',
         }
         local buf, win = open_menu('Configurações (Local)', lines, 60)
         local function update_line()
           lines[3] = ' 1. Modo Escrita: ' .. tostring(config.quarto_modo_escrita)
+          lines[4] = ' 2. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido)
           api.nvim_buf_set_lines(buf, 0, -1, false, lines)
         end
         vim.keymap.set('n', '1', function()
           config.quarto_modo_escrita = not config.quarto_modo_escrita
           update_line()
-          -- Salva apenas se houver ID (mas aqui não há, então não salva)
+        end, { buffer = buf })
+        vim.keymap.set('n', '2', function()
+          config.quarto_modo_rapido = not config.quarto_modo_rapido
+          update_line()
+        end, { buffer = buf })
+        vim.keymap.set('n', '<CR>', function()
+          local cursor = api.nvim_win_get_cursor(win)[1]
+          if cursor == 3 then
+            config.quarto_modo_escrita = not config.quarto_modo_escrita
+            update_line()
+          elseif cursor == 4 then
+            config.quarto_modo_rapido = not config.quarto_modo_rapido
+            update_line()
+          end
         end, { buffer = buf })
         return
       end
-      -- Para -p e -c, continua com local físico (já é o padrão)
     end
   end
 
-  -- Para comandos que precisam de shadow_info
   local shadow_info = nil
   if flag == '-r' or flag == '-k' or flag == '-l' or flag == '-p' or flag == '-c' then
     if config.quarto_usar_local_fisico then
-      -- Modo local: não usa shadow
       shadow_info = { dir = fn.fnamemodify(original_path, ':p:h'), path = original_path }
     else
       shadow_info = update_shadow_from_buffer(bufnr)
@@ -611,31 +674,16 @@ local function quarto_handler(args)
   end
 
   if flag == '-p' then
-    local compile, force_save, fmt = false, false, 'html'
-    for i = 2, #fargs do
-      if fargs[i] == '-c' then
-        compile = true
-      elseif fargs[i] == '-s' then
-        force_save = true
-      else
-        fmt = fargs[i]
-      end
-    end
+    local fmt = 'html'
+    if fargs[2] and (fargs[2] == 'pdf' or fargs[2] == 'html') then fmt = fargs[2] end
     sync_assets(shadow_info.dir, config)
-    start_preview(shadow_info, filename_with_ext, fmt, compile, config)
-    if force_save then vim.defer_fn(function() vim.notify('Force save não implementado para preview.', vim.log.levels.WARN) end, 3000) end
+    start_preview(shadow_info, filename_with_ext, fmt, config)
     return
   end
 
   if flag == '-c' then
-    local force_save, fmt = false, 'pdf'
-    for i = 2, #fargs do
-      if fargs[i] == '-s' then
-        force_save = true
-      else
-        fmt = fargs[i]
-      end
-    end
+    local fmt = 'pdf'
+    if fargs[2] and (fargs[2] == 'pdf' or fargs[2] == 'html') then fmt = fargs[2] end
     vim.notify('Renderizando ' .. fmt .. '...', vim.log.levels.INFO)
 
     local compile_dir = shadow_info.dir
@@ -653,24 +701,22 @@ local function quarto_handler(args)
     end
 
     local cmd_args = { 'quarto', 'render', filename_with_ext, '--to', fmt }
+    if config.quarto_modo_rapido then table.insert(cmd_args, '--no-execute') end
     fn.jobstart(cmd_args, {
       cwd = compile_dir,
       on_stdout = capture,
       on_stderr = capture,
       on_exit = function(_, code)
         fn.writefile(log_lines, render_log)
-        if code == 0 or force_save then
-          if code == 0 then
-            vim.notify('Render concluído.', vim.log.levels.INFO)
-          else
-            vim.notify('Render com erro, mas forçado.', vim.log.levels.WARN)
-          end
+        if code == 0 then
+          vim.notify('Render concluído.', vim.log.levels.INFO)
           local out_ext = (fmt == 'latex' and 'tex') or fmt
           local out_file = compile_dir .. '/' .. filename_no_ext .. '.' .. out_ext
-          if fn.filereadable(out_file) == 1 then fn.jobstart { 'xdg-open', out_file } end
+          if fn.filereadable(out_file) == 1 then open_with_default_app(out_file) end
           if not config.quarto_usar_local_fisico and config.quarto_comp_nativa then
             local dest = fn.fnamemodify(original_path, ':p:h') .. '/' .. fn.fnamemodify(out_file, ':t')
             fn.system { 'cp', out_file, dest }
+            vim.notify('Arquivo copiado para o diretório original.', vim.log.levels.INFO)
           end
         else
           vim.schedule(function()
@@ -684,46 +730,124 @@ local function quarto_handler(args)
   end
 
   if flag == '-b' then
-    local blocks = get_code_blocks(bufnr)
+    local blocks = get_all_blocks(bufnr)
     if #blocks == 0 then
-      vim.notify('Nenhum bloco.', vim.log.levels.WARN)
+      vim.notify('Nenhum bloco de código encontrado.', vim.log.levels.WARN)
       return
     end
-    local items = {}
-    for i, blk in ipairs(blocks) do
-      local preview = table.concat(blk.lines, ' '):sub(1, 40)
-      table.insert(items, string.format('%d. [%s] %s: %s...', i, blk.eval and '✓' or '✗', blk.lang, preview))
-    end
 
-    local function handle_block_selection(idx)
-      if not idx then return end
-      local code = table.concat(blocks[idx].lines, '\n')
-      local slime_ok, slime = pcall(require, 'slime')
+    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local menu_lines = { ' === Blocos de Código ===', '' }
 
-      if slime_ok then
-        vim.ui.select({ 'Enviar para REPL (tmux)', 'Copiar para clipboard' }, {
-          prompt = 'O que deseja fazer com o bloco?',
-        }, function(action)
-          if action == 'Enviar para REPL (tmux)' then
-            slime.send(code)
-            vim.notify('Enviado para REPL.', vim.log.levels.INFO)
-          elseif action == 'Copiar para clipboard' then
-            fn.setreg('+', code)
-            vim.notify('Copiado para clipboard.', vim.log.levels.INFO)
-          end
-        end)
-      else
-        fn.setreg('+', code)
-        vim.notify('vim-slime não encontrado. Código copiado para clipboard.', vim.log.levels.WARN)
+    local function build_menu_lines(blocks_list)
+      local all_braces = true
+      for _, blk in ipairs(blocks_list) do
+        if not blk.has_braces then all_braces = false end
       end
+      local new_menu = { ' === Blocos de Código ===', '' }
+      table.insert(new_menu, string.format(' 0. %s', all_braces and '[X] Marcar todos como NÃO executar' or '[ ] Marcar todos como executar'))
+      local buf_lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      for i, blk in ipairs(blocks_list) do
+        local preview = table.concat(vim.list_slice(buf_lines, blk.start, blk.finish), ' '):gsub('\n', ' '):sub(1, 40)
+        table.insert(new_menu, string.format(' %d. [%s] %s : %s...', i, blk.has_braces and '✓' or ' ', blk.lang, preview))
+      end
+      table.insert(new_menu, '')
+      table.insert(new_menu, ' Atalhos: <Enter> ou número = alternar execução')
+      table.insert(new_menu, '          r = enviar p/ REPL | p = copiar | R = remover | d = copiar e remover')
+      return new_menu
     end
 
-    vim.ui.select(items, { prompt = 'Escolha o bloco:' }, function(_, idx) handle_block_selection(idx) end)
+    menu_lines = build_menu_lines(blocks)
+    local buf, win = open_menu('Blocos', menu_lines, 80)
+
+    local function refresh_menu()
+      local new_blocks = get_all_blocks(bufnr)
+      local new_menu = build_menu_lines(new_blocks)
+      api.nvim_buf_set_lines(buf, 0, -1, false, new_menu)
+      return new_blocks
+    end
+
+    local function toggle_all()
+      local cur_blocks = get_all_blocks(bufnr)
+      local all_have_braces = true
+      for _, blk in ipairs(cur_blocks) do
+        if not blk.has_braces then all_have_braces = false end
+      end
+      local target_has_braces = not all_have_braces
+      for i, blk in ipairs(cur_blocks) do
+        if blk.has_braces ~= target_has_braces then toggle_block_braces(bufnr, i) end
+      end
+      refresh_menu()
+    end
+
+    vim.keymap.set('n', '0', toggle_all, { buffer = buf })
+    for i = 1, #blocks do
+      vim.keymap.set('n', tostring(i), function()
+        toggle_block_braces(bufnr, i)
+        refresh_menu()
+      end, { buffer = buf })
+    end
+
+    vim.keymap.set('n', '<CR>', function()
+      local cursor = api.nvim_win_get_cursor(win)[1]
+      if cursor == 3 then
+        toggle_all()
+      elseif cursor >= 4 and cursor <= 3 + #blocks then
+        local idx = cursor - 3
+        toggle_block_braces(bufnr, idx)
+        refresh_menu()
+      end
+    end, { buffer = buf })
+
+    vim.keymap.set('n', 'r', function()
+      local cursor = api.nvim_win_get_cursor(win)[1]
+      if cursor >= 4 and cursor <= 3 + #blocks then
+        local idx = cursor - 3
+        send_block_to_repl(bufnr, idx)
+      else
+        vim.notify('Posicione o cursor sobre um bloco.', vim.log.levels.WARN)
+      end
+    end, { buffer = buf })
+
+    vim.keymap.set('n', 'p', function()
+      local cursor = api.nvim_win_get_cursor(win)[1]
+      if cursor >= 4 and cursor <= 3 + #blocks then
+        local idx = cursor - 3
+        copy_block_content(bufnr, idx)
+      else
+        vim.notify('Posicione o cursor sobre um bloco.', vim.log.levels.WARN)
+      end
+    end, { buffer = buf })
+
+    vim.keymap.set('n', 'R', function()
+      local cursor = api.nvim_win_get_cursor(win)[1]
+      if cursor >= 4 and cursor <= 3 + #blocks then
+        local idx = cursor - 3
+        remove_block(bufnr, idx)
+        refresh_menu()
+        vim.notify('Bloco removido.', vim.log.levels.INFO)
+      else
+        vim.notify('Posicione o cursor sobre um bloco.', vim.log.levels.WARN)
+      end
+    end, { buffer = buf })
+
+    vim.keymap.set('n', 'd', function()
+      local cursor = api.nvim_win_get_cursor(win)[1]
+      if cursor >= 4 and cursor <= 3 + #blocks then
+        local idx = cursor - 3
+        copy_block_content(bufnr, idx)
+        remove_block(bufnr, idx)
+        refresh_menu()
+        vim.notify('Bloco copiado e removido.', vim.log.levels.INFO)
+      else
+        vim.notify('Posicione o cursor sobre um bloco.', vim.log.levels.WARN)
+      end
+    end, { buffer = buf })
+
     return
   end
 
   if flag == '-m' then
-    -- Se não tem ID, não deveria chegar aqui (já tratado acima), mas por segurança
     if not config.quarto_id then
       vim.notify('Shadow não configurado. Use :Quarto -p ou -c para criar.', vim.log.levels.WARN)
       return
@@ -732,36 +856,78 @@ local function quarto_handler(args)
     local lines = {
       ' === Configurações (salvas no YAML) ===',
       '',
-      ' 1. Compilação Nativa: ' .. tostring(config.quarto_comp_nativa),
-      ' 2. Modo Escrita: ' .. tostring(config.quarto_modo_escrita),
-      ' 3. Usar Local Físico (render): ' .. tostring(config.quarto_usar_local_fisico),
-      ' 4. Ignorar Ativos: ' .. tostring(config.quarto_ignorar_ativos),
-      ' 5. Ativos Gerais',
-      ' 6. Extensões',
-      ' 7. Templates',
+      ' 1. Usar diretório temporário (tmp): ' .. tostring(not config.quarto_usar_local_fisico),
+      ' 2. Push de arquivos para local físico: ' .. tostring(config.quarto_comp_nativa),
+      ' 3. Modo Escrita: ' .. tostring(config.quarto_modo_escrita),
+      ' 4. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido),
+      ' 5. Ignorar Ativos: ' .. tostring(config.quarto_ignorar_ativos),
+      ' 6. Ativos Gerais',
+      ' 7. Extensões',
+      ' 8. Templates',
       '',
-      ' Pressione o número',
+      ' Pressione o número ou <Enter> sobre a linha',
     }
     local buf, win = open_menu('Configurações', lines, 75)
 
-    local function update_line(key, line_idx)
-      local display_name = key:gsub('quarto_', ''):gsub('_', ' ')
-      lines[line_idx] = string.format(' %d. %s: %s', line_idx - 2, display_name, tostring(config[key]))
+    local function update_lines()
+      lines[3] = ' 1. Usar diretório temporário (tmp): ' .. tostring(not config.quarto_usar_local_fisico)
+      lines[4] = ' 2. Push de arquivos para local físico: ' .. tostring(config.quarto_comp_nativa)
+      lines[5] = ' 3. Modo Escrita: ' .. tostring(config.quarto_modo_escrita)
+      lines[6] = ' 4. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido)
+      lines[7] = ' 5. Ignorar Ativos: ' .. tostring(config.quarto_ignorar_ativos)
       api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     end
 
-    local function toggle(key, line_idx)
-      config[key] = not config[key]
-      update_line(key, line_idx)
+    local function toggle_quarto_usar_local_fisico()
+      config.quarto_usar_local_fisico = not config.quarto_usar_local_fisico
+      update_lines()
       save_buffer_config(bufnr)
     end
 
-    vim.keymap.set('n', '1', function() toggle('quarto_comp_nativa', 3) end, { buffer = buf })
-    vim.keymap.set('n', '2', function() toggle('quarto_modo_escrita', 4) end, { buffer = buf })
-    vim.keymap.set('n', '3', function() toggle('quarto_usar_local_fisico', 5) end, { buffer = buf })
-    vim.keymap.set('n', '4', function() toggle('quarto_ignorar_ativos', 6) end, { buffer = buf })
+    local function toggle_quarto_comp_nativa()
+      if config.quarto_usar_local_fisico then
+        vim.notify('Push só está disponível quando usando diretório tmp.', vim.log.levels.WARN)
+        return
+      end
+      config.quarto_comp_nativa = not config.quarto_comp_nativa
+      update_lines()
+      save_buffer_config(bufnr)
+    end
 
-    vim.keymap.set('n', '5', function()
+    local function toggle(key)
+      config[key] = not config[key]
+      update_lines()
+      save_buffer_config(bufnr)
+    end
+
+    vim.keymap.set('n', '1', toggle_quarto_usar_local_fisico, { buffer = buf })
+    vim.keymap.set('n', '2', toggle_quarto_comp_nativa, { buffer = buf })
+    vim.keymap.set('n', '3', function() toggle 'quarto_modo_escrita' end, { buffer = buf })
+    vim.keymap.set('n', '4', function() toggle 'quarto_modo_rapido' end, { buffer = buf })
+    vim.keymap.set('n', '5', function() toggle 'quarto_ignorar_ativos' end, { buffer = buf })
+
+    vim.keymap.set('n', '<CR>', function()
+      local cursor = api.nvim_win_get_cursor(win)[1]
+      if cursor == 3 then
+        toggle_quarto_usar_local_fisico()
+      elseif cursor == 4 then
+        toggle_quarto_comp_nativa()
+      elseif cursor == 5 then
+        toggle 'quarto_modo_escrita'
+      elseif cursor == 6 then
+        toggle 'quarto_modo_rapido'
+      elseif cursor == 7 then
+        toggle 'quarto_ignorar_ativos'
+      elseif cursor == 8 then
+        vim.cmd 'normal! 6'
+      elseif cursor == 9 then
+        vim.cmd 'normal! 7'
+      elseif cursor == 10 then
+        vim.cmd 'normal! 8'
+      end
+    end, { buffer = buf })
+
+    vim.keymap.set('n', '6', function()
       local gdir = fn.expand '~/Documents/Quarto/Gerais'
       fn.mkdir(gdir, 'p')
       local items = fn.readdir(gdir)
@@ -783,7 +949,7 @@ local function quarto_handler(args)
       end, { buffer = gbuf })
     end, { buffer = buf })
 
-    vim.keymap.set('n', '6', function()
+    vim.keymap.set('n', '7', function()
       local edir = fn.expand '~/Documents/Quarto/Extens'
       fn.mkdir(edir, 'p')
       local items = fn.readdir(edir)
@@ -805,7 +971,7 @@ local function quarto_handler(args)
       end, { buffer = ebuf })
     end, { buffer = buf })
 
-    vim.keymap.set('n', '7', function()
+    vim.keymap.set('n', '8', function()
       local tdir = fn.expand '~/Documents/Quarto/temp'
       fn.mkdir(tdir, 'p')
       local items = fn.readdir(tdir)
@@ -850,24 +1016,23 @@ local function setup_which_key()
   local runner_ok, runner = pcall(require, 'quarto.runner')
 
   wk.add {
-    { '<leader>th', '<cmd>Quarto -h<CR>', desc = 'Ajuda Quarto (tmp)' },
-    { '<leader>tp', group = 'Preview (tmp)' },
-    { '<leader>tpf', '<cmd>Quarto -p html<CR>', desc = 'Rápido HTML' },
-    { '<leader>tpc', '<cmd>Quarto -p -c pdf<CR>', desc = 'Compilado PDF' },
-    { '<leader>tph', '<cmd>Quarto -p -c html<CR>', desc = 'Compilado HTML' },
+    { '<leader>th', '<cmd>Quarto -h<CR>', desc = 'Ajuda Quarto' },
+    { '<leader>tp', group = 'Preview' },
+    { '<leader>tph', '<cmd>Quarto -p html<CR>', desc = 'HTML' },
+    { '<leader>tpp', '<cmd>Quarto -p pdf<CR>', desc = 'PDF' },
     { '<leader>tr', '<cmd>Quarto -r<CR>', desc = 'Atualizar preview' },
     { '<leader>tk', '<cmd>Quarto -k<CR>', desc = 'Parar preview' },
-    { '<leader>tc', group = 'Renderizar (tmp)' },
-    { '<leader>tcp', '<cmd>Quarto -c pdf<CR>', desc = 'PDF' },
+    { '<leader>tc', group = 'Renderizar' },
     { '<leader>tch', '<cmd>Quarto -c html<CR>', desc = 'HTML' },
-    { '<leader>tb', '<cmd>Quarto -b<CR>', desc = 'Executar bloco (slime)' },
+    { '<leader>tcp', '<cmd>Quarto -c pdf<CR>', desc = 'PDF' },
+    { '<leader>tb', '<cmd>Quarto -b<CR>', desc = 'Blocos' },
     { '<leader>tm', '<cmd>Quarto -m<CR>', desc = 'Configurações' },
-    { '<leader>tl', '<cmd>Quarto -l<CR>', desc = 'Ver logs' },
+    { '<leader>tl', '<cmd>Quarto -l<CR>', desc = 'Logs' },
   }
 
   if runner_ok then
     wk.add {
-      { '<leader>rc', runner.run_cell, desc = 'run cell (runner)' },
+      { '<leader>rc', runner.run_cell, desc = 'run cell' },
       { '<leader>ra', runner.run_above, desc = 'run cell and above' },
       { '<leader>rA', runner.run_all, desc = 'run all cells (same lang)' },
       { '<leader>rl', runner.run_line, desc = 'run line' },
@@ -878,14 +1043,14 @@ local function setup_which_key()
 end
 
 -- =========================================================================
---  Autocmds (mantidos, mas não disparam criação de YAML)
+--  Autocmds
 -- =========================================================================
 api.nvim_create_autocmd('InsertLeave', {
   group = quarto_group,
   pattern = { '*.qmd', '*.md', '*.Rmd', '*.rmd' },
   callback = function(ev)
     if not is_supported_extension(ev.buf) then return end
-    if preview_state.mode == 'fast' and preview_state.bufnr == ev.buf then
+    if preview_state.mode == 'compile' and preview_state.bufnr == ev.buf then
       refresh_preview()
     else
       update_shadow_from_buffer(ev.buf)

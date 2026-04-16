@@ -110,6 +110,21 @@ return {
         local client = vim.lsp.get_client_by_id(event.data.client_id)
         local bufnr = event.buf
 
+        -- ===== JULIALS: RESTRINGIR A ARQUIVOS .jl =====
+        if client.name == 'julials' then
+          local ft = vim.bo[bufnr].filetype
+          -- Se não for julia, desativa completamente o cliente neste buffer
+          if ft ~= 'julia' and 'quarto' then
+            client:stop()
+            return
+          end
+          -- Para arquivos julia, desabilita funcionalidades problemáticas
+          client.server_capabilities.documentFormattingProvider = false
+          client.server_capabilities.documentRangeFormattingProvider = false
+          client.server_capabilities.documentHighlightProvider = false
+          client.server_capabilities.semanticTokensProvider = false
+        end
+
         vim.bo[bufnr].omnifunc = 'v:lua.vim.lsp.omnifunc'
         local opts = { noremap = true, silent = true, buffer = bufnr }
 
