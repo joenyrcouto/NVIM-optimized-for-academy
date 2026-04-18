@@ -125,6 +125,18 @@ return {
           client.server_capabilities.semanticTokensProvider = false
         end
 
+        vim.api.nvim_create_autocmd('LspAttach', {
+          callback = function(args)
+            local client = vim.lsp.get_client_by_id(args.data.client_id)
+            if client and client.name == 'obsidian' then
+              -- Desabilita completamente o diagnóstico de links
+              client.server_capabilities.diagnosticProvider = false
+              -- Ou, se preferir desabilitar apenas um tipo específico:
+              -- vim.lsp.diagnostic.enable(false, args.buf)
+            end
+          end,
+        })
+
         vim.bo[bufnr].omnifunc = 'v:lua.vim.lsp.omnifunc'
         local opts = { noremap = true, silent = true, buffer = bufnr }
 
@@ -181,18 +193,6 @@ return {
         },
         bashls = {
           filetypes = { 'sh', 'bash', 'zsh' },
-        },
-        marksman = {
-          filetypes = { 'markdown', 'quarto' },
-        },
-        lua_ls = {
-          filetypes = { 'lua' },
-          settings = {
-            Lua = {
-              diagnostics = { globals = { 'vim', 'quarto' } },
-              workspace = { checkThirdParty = false },
-            },
-          },
         },
         pyright = {
           filetypes = { 'python' },

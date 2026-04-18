@@ -541,446 +541,52 @@ end, { desc = 'Terminal flutuante (hide/show, exit to destroy)' })
 -- [ CONFIGURAÇÕES ESPECÍFICAS DO OBSIDIAN ]
 -------------------------------------------------------------------
 
-local function is_obsidian_context()
-  local bufname = vim.api.nvim_buf_get_name(0)
-  if bufname ~= '' then
-    local ext = vim.fn.fnamemodify(bufname, ':e')
-    if ext ~= 'md' and ext ~= 'qmd' and ext ~= 'base' then return false end
-    local vault_path = vim.fn.expand '~/Documents/brain'
-    if bufname:find(vault_path, 1, true) then return true end
-  end
-  local cwd = vim.fn.getcwd()
-  local vault_path = vim.fn.expand '~/Documents/brain'
-  if cwd:find(vault_path, 1, true) then return true end
-  return false
-end
-
-local function ensure_in_vault()
-  if not is_obsidian_context() then
-    local vault_path = vim.fn.expand '~/Documents/brain'
-    vim.cmd('cd ' .. vault_path)
-    vim.notify('Diretório alterado para o vault: ' .. vault_path, vim.log.levels.INFO)
-  end
-end
-
--- ATALHO: Comandos Obsidian
-vim.keymap.set('n', '<leader>oo', function()
-  ensure_in_vault()
-  local obsidian_commands = {
-    { name = 'Quick Switch (Abrir nota)', cmd = 'ObsidianQuickSwitch' },
-    { name = 'Pesquisar notas', cmd = 'ObsidianSearch' },
-    { name = 'Nova nota', cmd = 'ObsidianNew' },
-    { name = 'Nota de hoje', cmd = 'ObsidianToday' },
-    { name = 'Nota de ontem', cmd = 'ObsidianYesterday' },
-    { name = 'Notas diárias', cmd = 'ObsidianDailies' },
-    { name = 'Backlinks', cmd = 'ObsidianBacklinks' },
-    { name = 'Tags', cmd = 'ObsidianTags' },
-    { name = 'Colar imagem', cmd = 'ObsidianPasteImg' },
-    { name = 'Renomear nota', cmd = 'ObsidianRename' },
-    { name = 'Seguir link', cmd = 'ObsidianFollowLink' },
-    { name = 'Template', cmd = 'ObsidianTemplate' },
-    { name = 'Abrir no navegador', cmd = 'ObsidianOpen' },
-    { name = 'Workspace', cmd = 'ObsidianWorkspace' },
-  }
-  local pickers = require 'telescope.pickers'
-  local finders = require 'telescope.finders'
-  local conf = require('telescope.config').values
-  local actions = require 'telescope.actions'
-  local action_state = require 'telescope.actions.state'
-  pickers
-    .new({}, {
-      prompt_title = 'Comandos Obsidian',
-      finder = finders.new_table {
-        results = obsidian_commands,
-        entry_maker = function(entry) return { value = entry, display = entry.name, ordinal = entry.name } end,
-      },
-      sorter = conf.generic_sorter {},
-      attach_mappings = function(prompt_bufnr, map)
-        actions.select_default:replace(function()
-          actions.close(prompt_bufnr)
-          local selection = action_state.get_selected_entry()
-          if selection then vim.cmd(selection.value.cmd) end
-        end)
-        return true
-      end,
-    })
-    :find()
-end, { desc = 'Obsidian: Comandos (Telescope)' })
-
--- Templates por pasta
-local folder_template_map = {
-  ['00-rápidas'] = '00-rápidas-tlp.md',
-  ['01-notelm'] = '01-notelm-tlp.md',
-  ['02-zettel'] = '02-zettel-tlp.md',
-  ['03-MOC'] = '03-MOC-tlp.md',
-  ['99-brutos/biblioteca'] = '99-Acervo-tlp.md',
-  ['99-brutos/tracking'] = '99-tracking-tlp.md',
-  ['99-brutos/exercícios'] = '99-exercícios-tlp.md',
-}
-
-local function translate_template(content, title)
-  local now = os.date
-  local date = now '%Y-%m-%d'
-  local time = now '%H:%M'
-  local datetime = date .. ' ' .. time
-  local datetime_t = date .. 'T' .. time
-  local patterns = {
-    { '<%% tp%.date%.now%("YYYY%-MM%-DD HH:mm"%) %%>', datetime },
-    { '<%% tp%.date%.now%("YYYY%-MM%-DDTHH:mm"%) %%>', datetime_t },
-    { '<%% tp%.date%.now%("YYYY%-MM%-DD"%) %%>', date },
-    { '<%% tp%.file%.title %%>', title },
-    { '{{title}}', title },
-    { '{{date}}', date },
-    { '{{time}}', time },
-  }
-  local translated = content
-  for _, pat in ipairs(patterns) do
-    translated = translated:gsub(pat[1], pat[2])
-  end
-  return translated
-end
-
-local function get_vault_directories(vault_path)
-  local dirs = {}
-  local function scan(current_path, depth)
-    local items = vim.fn.readdir(current_path)
-    for _, item in ipairs(items) do
-      local full = current_path .. '/' .. item
-      if vim.fn.isdirectory(full) == 1 then
-        if not item:match '^%.' then
-          table.insert(dirs, { path = full, depth = depth })
-          scan(full, depth + 1)
-        end
-      end
-    end
-  end
-  scan(vault_path, 1)
-  table.sort(dirs, function(a, b)
-    if a.depth == b.depth then
-      return a.path < b.path
-    else
-      return a.depth < b.depth
-    end
-  end)
-  local relative_dirs = {}
-  for _, d in ipairs(dirs) do
-    local rel = d.path:sub(#vault_path + 2)
-    table.insert(relative_dirs, rel)
-  end
-  return relative_dirs
-end
-
--- NOVA NOTA COM SELEÇÃO DE DIRETÓRIO (aceita pré-seleção via opts)
-local function new_obsidian_note_with_directory_telescope(opts)
-  opts = opts or {}
-  ensure_in_vault()
-  local vault_path = vim.fn.expand '~/Documents/brain'
-  local template_dir = vault_path .. '/99-brutos/templates/'
-  local directories = get_vault_directories(vault_path)
-  table.insert(directories, 1, '')
-
-  local pickers = require 'telescope.pickers'
-  local finders = require 'telescope.finders'
-  local conf = require('telescope.config').values
-  local actions = require 'telescope.actions'
-  local action_state = require 'telescope.actions.state'
-
-  pickers
-    .new({}, {
-      prompt_title = 'Escolha o diretório para a nova nota',
-      finder = finders.new_table {
-        results = directories,
-        entry_maker = function(dir)
-          local display = dir == '' and '[raiz do vault]' or dir
-          return { value = dir, display = display, ordinal = display }
-        end,
-      },
-      sorter = conf.generic_sorter {},
-      attach_mappings = function(prompt_bufnr, map)
-        actions.select_default:replace(function()
-          actions.close(prompt_bufnr)
-          local selection = action_state.get_selected_entry()
-          if not selection then return end
-          local chosen_dir = opts.default_dir or selection.value
-          local default_name = opts.default_name or ''
-          vim.ui.input({
-            prompt = 'Nome da nota (sem extensão): ',
-            default = default_name,
-          }, function(filename)
-            if not filename or filename == '' then return end
-            local rel_path = chosen_dir == '' and filename or chosen_dir .. '/' .. filename
-            if not rel_path:match '%.%w+$' then rel_path = rel_path .. '.md' end
-            local full_path = vault_path .. '/' .. rel_path
-            local title = vim.fn.fnamemodify(filename, ':r')
-
-            local template_name = nil
-            local clean_rel = rel_path:gsub('^/', '')
-            for folder, tpl in pairs(folder_template_map) do
-              if clean_rel == folder or vim.startswith(clean_rel, folder .. '/') then
-                template_name = tpl
-                break
-              end
-            end
-
-            local content
-            if template_name then
-              local f = io.open(template_dir .. template_name, 'r')
-              if f then
-                content = f:read '*a'
-                f:close()
-                content = translate_template(content, title)
-              else
-                content = string.format('---\ntitle: %s\ndate: %s %s\n---\n', title, os.date '%Y-%m-%d', os.date '%H:%M')
-              end
-            else
-              content = string.format('---\ntitle: %s\ndate: %s %s\n---\n', title, os.date '%Y-%m-%d', os.date '%H:%M')
-            end
-
-            if vim.fn.filereadable(full_path) == 1 then
-              vim.ui.select({ 'Sim', 'Não' }, { prompt = 'O arquivo já existe. Deseja sobrescrevê-lo?' }, function(choice)
-                if choice == 'Sim' then
-                  vim.fn.mkdir(vim.fn.fnamemodify(full_path, ':h'), 'p')
-                  local file = io.open(full_path, 'w')
-                  if file then
-                    file:write(content)
-                    file:close()
-                    vim.cmd('edit ' .. vim.fn.fnameescape(full_path))
-                  end
-                end
-              end)
-            else
-              vim.fn.mkdir(vim.fn.fnamemodify(full_path, ':h'), 'p')
-              local file = io.open(full_path, 'w')
-              if file then
-                file:write(content)
-                file:close()
-                vim.cmd('edit ' .. vim.fn.fnameescape(full_path))
-              end
-            end
-          end)
-        end)
-        return true
-      end,
-    })
-    :find()
-end
-
--- Extensões suportadas
-local obsidian_extensions = { 'excalidraw', 'md', 'qmd', 'js', 'base' }
-
--- QUICK SWITCH PERSONALIZADO
-local function obsidian_quick_switch_telescope()
-  ensure_in_vault()
-  local vault_path = vim.fn.expand '~/Documents/brain'
-  local glob_pattern = '**/*.{' .. table.concat(obsidian_extensions, ',') .. '}'
-  local cmd = {
-    'rg',
-    '--files',
-    '--iglob',
-    glob_pattern,
-    '--iglob',
-    '!**/.*',
-    '--color',
-    'never',
-    '--no-heading',
-    '--with-filename',
-    '--line-number',
-    '--column',
-    vault_path,
-  }
-  local pickers = require 'telescope.pickers'
-  local finders = require 'telescope.finders'
-  local conf = require('telescope.config').values
-  local actions = require 'telescope.actions'
-  local action_state = require 'telescope.actions.state'
-  local original_buf = vim.api.nvim_get_current_buf()
-  local cursor_pos = vim.api.nvim_win_get_cursor(0)
-
-  pickers
-    .new({}, {
-      prompt_title = 'Notes | <CR> confirm | <C-l> insert link',
-      finder = finders.new_oneshot_job(cmd, {
-        entry_maker = function(line)
-          local full_path = line:match '^([^:]+)'
-          if not full_path then return nil end
-          local rel_path = full_path:sub(#vault_path + 2)
-          local name_with_ext = vim.fn.fnamemodify(rel_path, ':t')
-          local name_base = vim.fn.fnamemodify(rel_path, ':t:r')
-          local ext = vim.fn.fnamemodify(rel_path, ':e')
-          local link_name = (ext == 'md' or ext == 'qmd') and name_base or name_with_ext
-          return { value = full_path, display = rel_path, ordinal = rel_path, link_name = link_name }
-        end,
-      }),
-      sorter = conf.generic_sorter {},
-      attach_mappings = function(prompt_bufnr, map)
-        actions.select_default:replace(function()
-          actions.close(prompt_bufnr)
-          local selection = action_state.get_selected_entry()
-          if selection then vim.cmd('edit ' .. vim.fn.fnameescape(selection.value)) end
-        end)
-        local function insert_link()
-          local selection = action_state.get_selected_entry()
-          if not selection then return end
-          actions.close(prompt_bufnr)
-          local link_text = '[[' .. selection.link_name .. ']]'
-          local row = cursor_pos[1] - 1
-          local col = cursor_pos[2]
-          vim.api.nvim_buf_set_text(original_buf, row, col, row, col, { link_text })
-          vim.notify('Link inserido: ' .. link_text, vim.log.levels.INFO)
-        end
-        map('i', '<C-l>', insert_link)
-        map('n', '<C-l>', insert_link)
-        return true
-      end,
-    })
-    :find()
-end
-
-vim.keymap.set('n', '<leader>of', obsidian_quick_switch_telescope, { desc = 'Obsidian: Quick Switch (Telescope)' })
-
--- Demais atalhos Obsidian
-vim.keymap.set('n', '<leader>os', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianSearch'
-end, { desc = 'Obsidian: Pesquisar notas' })
-vim.keymap.set('n', '<leader>on', new_obsidian_note_with_directory_telescope, { desc = 'Obsidian: Nova nota (escolher diretório)' })
-vim.keymap.set('n', '<leader>ot', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianToday'
-end, { desc = 'Obsidian: Nota de hoje' })
-vim.keymap.set('n', '<leader>oy', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianYesterday'
-end, { desc = 'Obsidian: Nota de ontem' })
-vim.keymap.set('n', '<leader>od', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianDailies'
-end, { desc = 'Obsidian: Notas diárias' })
-vim.keymap.set('n', '<leader>ob', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianBacklinks'
-end, { desc = 'Obsidian: Backlinks' })
-vim.keymap.set('n', '<leader>og', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianTags'
-end, { desc = 'Obsidian: Tags' })
-vim.keymap.set('n', '<leader>oi', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianPasteImg'
-end, { desc = 'Obsidian: Colar imagem' })
-vim.keymap.set('n', '<leader>or', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianRename'
-end, { desc = 'Obsidian: Renomear nota' })
-vim.keymap.set('n', '<leader>op', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianTemplate'
-end, { desc = 'Obsidian: Template' })
-vim.keymap.set('n', '<leader>ow', function()
-  ensure_in_vault()
-  vim.cmd 'ObsidianWorkspace'
-end, { desc = 'Obsidian: Workspace' })
-vim.keymap.set('n', '<leader>ov', function() vim.cmd('cd ' .. vim.fn.expand '~/Documents/brain') end, { desc = 'Obsidian: Abrir caminho do vault' })
-
--- NOVA FUNÇÃO PARA SEGUIR LINKS (com suporte a criação)
-local function find_note_by_link(link)
-  local vault_path = vim.fn.expand '~/Documents/brain'
-  -- Remove âncoras
-  local clean_link = link:match '([^#]+)' or link
-  -- Tenta encontrar arquivo com extensões suportadas (busca recursiva)
-  for _, ext in ipairs(obsidian_extensions) do
-    local pattern = vault_path .. '/**/' .. clean_link .. '.' .. ext
-    local files = vim.fn.glob(pattern, false, true)
-    if #files > 0 then return files[1], ext end
-  end
-  -- Tenta também se o link já inclui extensão
-  if clean_link:match '%.%w+$' then
-    local full = vault_path .. '/' .. clean_link
-    if vim.fn.filereadable(full) == 1 then
-      local ext = vim.fn.fnamemodify(full, ':e')
-      return full, ext
-    end
-  end
-  return nil, nil
-end
-
-vim.keymap.set('n', '<CR>', function()
-  if not is_obsidian_context() then return '<CR>' end
-
-  -- Tenta primeiro os métodos nativos do obsidian.nvim
-  local ok, obsidian = pcall(require, 'obsidian')
-  if ok then
-    local client = obsidian.get_client()
-    if client and pcall(client.follow_link, client) then return '' end
-  end
-  if pcall(vim.cmd, 'ObsidianFollowLink') then return '' end
-
-  -- Fallback manual
-  local line = vim.api.nvim_get_current_line()
-  local link = line:match '%[%[([^%]]+)%]%]' or line:match '%[.-%]%(([^%)]+)%)'
-  if not link then return '<CR>' end
-
-  local file_path, ext = find_note_by_link(link)
-  if file_path then
-    if ext == 'md' or ext == 'qmd' then
-      vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
-    else
-      vim.cmd('tabnew ' .. vim.fn.fnameescape(file_path))
-    end
-    return ''
-  end
-
-  -- Arquivo não existe: pergunta se quer criar
-  vim.ui.select({ 'Sim', 'Não' }, {
-    prompt = 'Arquivo "' .. link .. '" não existe. Deseja criá-lo?',
-  }, function(choice)
-    if choice == 'Sim' then
-      -- Extrai diretório e nome do link
-      local dir, name = link:match '^(.*)/([^/]+)$'
-      local opts = {}
-      if dir then
-        opts.default_dir = dir
-        opts.default_name = name
-      else
-        opts.default_name = link
-      end
-      new_obsidian_note_with_directory_telescope(opts)
-    end
-  end)
-  return ''
-end, { expr = true, desc = 'Obsidian: Seguir Link (com criação)' })
-
--- Atalhos visuais
-vim.keymap.set('v', '<leader>ol', function()
-  if is_obsidian_context() then vim.cmd 'ObsidianLink' end
-end, { desc = 'Obsidian: Criar link' })
-vim.keymap.set('v', '<leader>ox', function()
-  if is_obsidian_context() then vim.cmd 'ObsidianExtractNote' end
-end, { desc = 'Obsidian: Extrair para nova nota' })
-
-vim.api.nvim_create_user_command('ObsidianVault', function()
-  vim.cmd('cd ' .. vim.fn.expand '~/Documents/brain')
-  vim.cmd 'ObsidianQuickSwitch'
-end, { desc = 'Abrir vault do Obsidian' })
-
--- Which-key
+-- Substitua os mapeamentos avulsos do Obsidian pela estrutura nativa do which-key:
 wk.add {
-  { '<leader>o', group = '[o]bsidian' },
-  { '<leader>oo', desc = 'Comandos (Telescope)' },
-  { '<leader>os', desc = 'Pesquisar' },
-  { '<leader>on', desc = 'Nova nota' },
-  { '<leader>ot', desc = 'Hoje' },
-  { '<leader>oy', desc = 'Ontem' },
-  { '<leader>od', desc = 'Diárias' },
-  { '<leader>ob', desc = 'Backlinks' },
-  { '<leader>og', desc = 'Tags' },
-  { '<leader>oi', desc = 'Colar imagem' },
-  { '<leader>or', desc = 'Renomear' },
-  { '<leader>op', desc = 'Template' },
-  { '<leader>ow', desc = 'Workspace' },
-  { '<leader>ov', desc = 'Abrir vault' },
-  { '<leader>t', group = '[t]mp Tools/Quarto' },
-  { '<leader>to', desc = 'Obsidian Quick Switch' },
+  -- Mapeamentos Globais (Modo Normal)
+  {
+    mode = { 'n' },
+    { '<CR>', '<cmd>ObsidianFollowLink<cr>', desc = 'Seguir Link' },
+  },
+
+  -- Grupo Obsidian (Modo Normal)
+  {
+    mode = { 'n' },
+    { '<leader>o', group = '[o]bsidian' },
+    { '<leader>oa', '<cmd>ObsidianOpen<cr>', desc = 'Abrir no App (Obsidian)' },
+    { '<leader>ob', '<cmd>ObsidianBacklinks<cr>', desc = 'Backlinks' },
+    { '<leader>od', '<cmd>ObsidianDailies<cr>', desc = 'Lista de Notas Diárias' },
+    { '<leader>of', '<cmd>ObsidianQuickSwitch<cr>', desc = 'Quick Switch (Telescope/FZF)' },
+    { '<leader>og', '<cmd>ObsidianTags<cr>', desc = 'Pesquisar Tags' },
+    { '<leader>oi', '<cmd>ObsidianPasteImg<cr>', desc = 'Colar Imagem da Área de Transferência' },
+    { '<leader>on', '<cmd>ObsidianNew<cr>', desc = 'Nova Nota (com Template)' },
+    { '<leader>op', '<cmd>ObsidianTemplate<cr>', desc = 'Inserir Template' },
+    { '<leader>or', '<cmd>ObsidianRename<cr>', desc = 'Renomear Nota e Atualizar Links' },
+    { '<leader>os', '<cmd>ObsidianSearch<cr>', desc = 'Pesquisar Texto no Vault (Grep)' },
+    { '<leader>ot', '<cmd>ObsidianToday<cr>', desc = 'Nota de Hoje' },
+    { '<leader>ow', '<cmd>ObsidianWorkspace<cr>', desc = 'Trocar Workspace' },
+    { '<leader>oy', '<cmd>ObsidianYesterday<cr>', desc = 'Nota de Ontem' },
+    {
+      '<leader>ov',
+      function()
+        -- Obtém o cliente para pegar o caminho do vault configurado dinamicamente
+        local client = require('obsidian').get_client()
+        if client then
+          vim.cmd('cd ' .. tostring(client.dir))
+          vim.notify('Diretório alterado para o Vault: ' .. tostring(client.dir), vim.log.levels.INFO)
+        end
+      end,
+      desc = 'Abrir Vault no Terminal (CD)',
+    },
+  },
+
+  -- Grupo Obsidian (Modo Visual)
+  {
+    mode = { 'v' },
+    { '<leader>o', group = '[o]bsidian' },
+    { '<leader>ol', ':ObsidianLink<cr>', desc = 'Transformar seleção em Link' },
+    { '<leader>ox', ':ObsidianExtractNote<cr>', desc = 'Extrair seleção para nova nota' },
+  },
 }
 
 -- ==========================================

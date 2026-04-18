@@ -8,7 +8,7 @@
 
 ## 📖 Fluxos principais (resumo)
 
-### 🧠 Obsidian Vault (obsidian.nvim)
+### 🧠 Obsidian Vault ([obsidian.nvim](https://github.com/joenyrcouto/obsidian.nvim))
 - Vault em `~/Documents/brain`.
 - `<Enter>` segue links `[[...]]`. Templates em `content/99-brutos/Templates`.
 - Tem o plugin  `obsidian-bridge.nvim`. Configure o [edit-in-neovim](https://github.com/TheseusGrey/edit-in-neovim) no seu app do Obsidian.

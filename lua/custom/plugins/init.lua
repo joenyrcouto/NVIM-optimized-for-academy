@@ -6,6 +6,9 @@
 ---@module 'lazy'
 ---@type LazySpec
 
+-- Defina o caminho onde está o seu fork refatorado
+local obsidian_fork_path = vim.fn.expand '~/Documents/git/obsidian.nvim'
+
 -----------------------------------------------------------
 -- INTEGRAÇÃO QUARTO / DATA SCIENCE
 -----------------------------------------------------------
@@ -16,6 +19,16 @@ require 'config.keymap'
 -- require 'config.lazy'
 require 'config.redir'
 require 'quarto_tmp'
+
+-- Arruma para o ui obsidian nos .md e .qmd
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'markdown', 'quarto' },
+  callback = function()
+    -- 2: Esconde totalmente o texto oculto (links ficam limpos)
+    -- 1: Substitui o texto oculto por um caractere (se definido)
+    vim.opt_local.conceallevel = 2
+  end,
+})
 
 -- Garante o uso do Treesitter para indentação e dobras
 vim.api.nvim_create_autocmd('FileType', {
@@ -119,40 +132,73 @@ return {
     end,
   },
 
-  -- 1. Plugin Principal: Gestão do Vault e Notas
+  -- 1. plugin principal: gestão do vault e notas
   {
-    'epwalsh/obsidian.nvim',
+    'joenyrcouto/obsidian.nvim',
     version = '*',
-    event = {
-      'BufReadPre ' .. vim.fn.expand '~' .. '~/Documents/brain**',
-      'BufNewFile ' .. vim.fn.expand '~' .. '~/Documents/brain/**',
-    },
+    -- Ajuste no evento para carregar apenas quando abrir arquivos no vault
     lazy = false,
+    event = {
+      'BufReadPre ' .. vim.fn.expand '~' .. '/documents/brain/**',
+      'BufNewFile ' .. vim.fn.expand '~' .. '/documents/brain/**',
+    },
     dependencies = { 'nvim-lua/plenary.nvim' },
     opts = {
-      workspaces = { { name = 'estudos', path = '~/Documents/brain' } },
+      workspaces = {
+        { name = 'brain', path = '~/Documents/brain' },
+      },
+
+      -- CONFIGURAÇÃO DE EXTENSÕES (Obrigatório para o novo motor)
+      -- allowed_extensions: o que o plugin consegue "enxergar" e pesquisar
+      -- writable_extensions: o que o plugin tem permissão para criar/editar
+      allowed_extensions = { '.md', '.qmd', '.base', '.js' },
+      writable_extensions = { '.md', '.qmd', '.base' },
+
       templates = {
-        subdir = '99-brutos/templates',
+        folder = '99-brutos/templates', -- 'subdir' foi normalizado para 'folder' no upstream
         date_format = '%Y-%m-%d',
-        time_format = '%H-%M',
+        time_format = '%H:%M',
+        -- NOVO: Mapeamento de pastas para templates automáticos
+        -- A chave é a pasta (relativa ao vault), o valor é o nome do arquivo de template
+        template_mappings = {
+          ['00-rápidas'] = '00-rápidas-tlp.md',
+          ['01-notelm'] = '01-notelm-tlp.md',
+          ['02-zettel'] = '02-zettel-tlp.md',
+          ['03-moc'] = '03-moc-tlp.md',
+          ['99-brutos/biblioteca'] = '99-acervo-tlp.md',
+          ['99-brutos/tracking'] = '99-tracking-tlp.md',
+          ['99-brutos/exercícios'] = '99-exercícios-tlp.md',
+        },
+        -- NOVO: Ativa a tradução de sintaxe do Templater (<% tp.date.now() %>)
+        templater_compat = true,
       },
-      -- NOVO: Mapeamento de pastas para templates automáticos
-      note_template = {
-        ['00-rápidas'] = '00-rápidas-tlp.md',
-        ['01-notelm'] = '01-notelm-tlp.md',
-        ['02-zettel'] = '02-zettel-tlp.md',
-        ['03-MOC'] = '03-MOC-tlp.md',
-        ['99-brutos/biblioteca'] = '99-Acervo-tlp.md',
-        ['99-brutos/tracking'] = '99-tracking-tlp.md',
-        ['99-brutos/exercícios'] = '99-exercícios-tlp.md',
+
+      daily_notes = {
+        folder = '99-brutos/diárias',
+        date_format = '%Y-%m-%d',
+        template = '99-tracking-tlp.md',
       },
-      extensions = { '.md', '.qmd', '.base' },
-      completion = { nvim_cmp = false, min_chars = 2 },
-      attachments = { folder = '99-brutos' },
-      daily_notes = { folder = '00-rápidas', date_format = '%Y-%m-%d', template = '00-rápidas-tlp.md' },
+
+      completion = {
+        nvim_cmp = true, -- Mude para true se usar nvim-cmp para autocompletar links
+        min_chars = 2,
+      },
+
+      attachments = {
+        folder = '99-brutos/anexos', -- Recomendo uma subpasta para não poluir a raiz de brutos
+        img_folder = '99-brutos/anexos',
+        -- NOVO: Formata o link como ![[imagem.png]] (Padrão Obsidian)
+        img_text_func = function(client, path)
+          local name = vim.fs.basename(tostring(path))
+          return string.format('![[%s]]', name)
+        end,
+      },
+
+      ui = { enable = true },
+      -- Garante que comandos antigos não poluam o ambiente
       legacy_commands = false,
-      ui = { enable = false },
     },
+    config = function(_, opts) require('obsidian').setup(opts) end,
   },
 
   -- 2. Plugin Bridge: Sincronização de Navegação (Neovim -> Obsidian)
@@ -165,6 +211,7 @@ return {
       scroll_sync = false, -- Deixe false a menos que use a versão modificada do REST API
       warnings = true,
       extensions = { '.md', '.qmd', '.base' },
+      img_folder = '99-brutos/anexos',
     },
     config = function(_, opts)
       -- Só ativa o bridge se o arquivo atual estiver dentro do seu Vault

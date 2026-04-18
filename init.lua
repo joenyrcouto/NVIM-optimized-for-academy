@@ -599,7 +599,6 @@ require('lazy').setup({
       --  See `:help lsp-config` for information about keys and how to configure
       ---@type table<string, vim.lsp.Config>
       local servers = {
-        marksman = {}, -- Para Markdown e Quarto
         julials = {}, -- Para Julia
         tinymist = {}, -- O melhor LSP moderno para Typst (muito mais rápido que o typst_lsp)
         pyright = {}, -- Para Python (opcional, se você usar)
