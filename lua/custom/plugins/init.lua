@@ -1,10 +1,8 @@
--- You can add your own plugins here or in other files in this directory!
---  I promise not to create any merge conflicts in this directory :)
---
--- See the kickstart.nvim README for more information
+vim.opt.conceallevel = 2
 
 require 'config.keymap'
 require 'quarto_tmp'
+
 
 ---@module 'lazy'
 ---@type LazySpec
@@ -15,6 +13,8 @@ return {
     dependencies = { 'nvim-lua/plenary.nvim' },
     opts = {
       workspaces = { { name = 'brain', path = '~/Documents/brain' } },
+      -- Desativamos a REST API automática para evitar o erro de autenticação E5108
+      use_local_rest_api = false,
       allowed_extensions = { '.md', '.qmd', '.base', '.js', '.excalidraw' },
       writable_extensions = { '.md', '.qmd', '.base' },
       templates = {
@@ -44,20 +44,12 @@ return {
           return string.format('![[%s]]', name)
         end,
       },
-      ui = { enable = true, checkboxes = {}, bullets = {} }, -- Ativa seu validador de links laranja/vermelho
+      ui = { enable = true, checkboxes = {}, bullets = {} },
       legacy_commands = false,
     },
     config = function(_, opts) require('obsidian').setup(opts) end,
   },
 
-  {
-    'oflisback/obsidian-bridge.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim' },
-    opts = {
-      obsidian_server_address = 'http://localhost:27123',
-      extensions = { '.md', '.qmd', '.base' },
-    },
-  },
 
   {
     'olimorris/codecompanion.nvim',
@@ -83,25 +75,11 @@ return {
     dependencies = { 'nvim-lua/plenary.nvim' },
   },
 
-  {
-    '3rd/image.nvim',
-    opts = {},
-  },
+  { '3rd/image.nvim', opts = {} },
 
   {
-    'olimorris/codecompanion.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim', 'nvim-treesitter/nvim-treesitter' },
-    config = function()
-      require('codecompanion').setup {
-        strategies = { chat = { adapter = 'lmstudio' }, inline = { adapter = 'lmstudio' } },
-        adapters = {
-          lmstudio = function()
-            return require('codecompanion.adapters').extend('openai_compatible', {
-              env = { url = 'http://localhost:1234' },
-            })
-          end,
-        },
-      }
-    end,
+    'MeanderingProgrammer/render-markdown.nvim',
+    dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-mini/mini.nvim' },
+    opts = {},
   },
 }

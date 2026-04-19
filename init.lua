@@ -90,8 +90,61 @@ P.S. You can delete this when you're done too. It's your config now! :)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
+-- =============================================================================
+-- PONTE OBSIDIAN (Sincronização Global)
+-- =============================================================================
+if vim.g.launched_from_obsidian then
+    vim.g.obsidian_bridge_active = true
+else
+    vim.g.obsidian_bridge_active = false
+end
+
+local function sync_to_obsidian()
+    if not vim.g.obsidian_bridge_active then return end
+    local bufnr = vim.api.nvim_get_current_buf()
+    local filepath = vim.fn.expand("%:p")
+    local buftype = vim.bo[bufnr].buftype
+    -- Filtro rigoroso para não disparar no Telescope
+    if buftype ~= "" or filepath == "" or vim.fn.getreg(':') == 'TelescopePrompt' then 
+        return
+    end
+    if not (filepath:find("%.md$") or filepath:find("%.qmd$") or filepath:find("%.base$")) then
+        return
+    end
+
+    local encoded_path = filepath:gsub(" ", "%%20")
+    local uri = "obsidian://open?path=" .. encoded_path
+
+    if vim.fn.has("unix") == 1 then
+        vim.fn.jobstart({"xdg-open", uri})
+    end
+end
+
+local obsidian_sync_group = vim.api.nvim_create_augroup("ObsidianSync", { clear = true })
+vim.api.nvim_create_autocmd("BufEnter", {
+    group = obsidian_sync_group,
+    pattern = { "*.md", "*.qmd", "*.base" },
+    callback = function()
+        vim.defer_fn(sync_to_obsidian, 200) -- Aumentado para 200ms para estabilidade
+    end
+})
+
+-- Autocmd para monitorar a troca de arquivos
+local obsidian_sync_group = vim.api.nvim_create_augroup("ObsidianSync", { clear = true })
+vim.api.nvim_create_autocmd("BufEnter", {
+    group = obsidian_sync_group,
+    pattern = { "*.md", "*.qmd", "*.base" },
+    callback = function()
+        vim.defer_fn(sync_to_obsidian, 100)
+    end
+})
+
+-- =============================================================================
+-- FIM DA INTEGRAÇÃO OBSIDIAN
+-- =============================================================================
+
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = teue
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -966,6 +1019,18 @@ require('lazy').setup({
   -- In normal mode type `<space>sh` then write `lazy.nvim-plugin`
   -- you can continue same window with `<space>sr` which resumes last telescope search
 }, { ---@diagnostic disable-line: missing-fields
+   -- ADICIONE ESTA LINHA: Força o Lazy a usar a pasta de plugins original
+  root = vim.fn.expand("~/.local/share/nvim/lazy"),
+  
+  install = {
+    -- Se veio do Obsidian, não tenta instalar nada novo
+    missing = not vim.g.launched_from_obsidian,
+  },
+  checker = {
+    -- Se veio do Obsidian, desativa checagem de updates
+    enabled = not vim.g.launched_from_obsidian,
+  },
+  -- MANTER O RESTO:
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
     -- default lazy.nvim defined Nerd Font icons, otherwise define a unicode icons table

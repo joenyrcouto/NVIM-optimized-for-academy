@@ -76,10 +76,14 @@ local function send_cell()
     return
   end
 
+  -- Verificação de segurança adicionada aqui:
   if vim.b['quarto_is_r_mode'] == nil then
-    vim.fn['slime#send_cell']()
+    if vim.b.slime_cell_delimiter ~= nil then
+      pcall(vim.fn['slime#send_cell'])
+    end
     return
   end
+
   if vim.b['quarto_is_r_mode'] == true then
     vim.g.slime_python_ipython = 0
     local is_python = require('otter.tools.functions').is_otter_language_context 'python'
@@ -91,7 +95,11 @@ local function send_cell()
       vim.fn['slime#send']('exit' .. '\r')
       vim.b['reticulate_running'] = false
     end
-    vim.fn['slime#send_cell']()
+    
+    -- Verificação de segurança também no modo R:
+    if vim.b.slime_cell_delimiter ~= nil then
+      pcall(vim.fn['slime#send_cell'])
+    end
   end
 end
 

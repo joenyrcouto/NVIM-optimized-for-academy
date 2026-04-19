@@ -355,7 +355,12 @@ return {
       -- Inicializa variáveis de buffer para todas as linguagens suportadas
       local langs = { 'python', 'r', 'julia', 'bash' }
       for _, lang in ipairs(langs) do
-        vim.b['quarto_is_' .. lang .. '_chunk'] = false
+        vim.api.nvim_create_autocmd("FileType", {
+          pattern = "quarto",
+          callback = function()
+              vim.b.slime_cell_delimiter = "```"
+          end,
+      })
       end
 
       -- Função global para verificar se estamos em um chunk de uma linguagem específica
