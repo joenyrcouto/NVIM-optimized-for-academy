@@ -163,19 +163,6 @@ vim.api.nvim_create_autocmd("BufEnter", {
 -- FIM DA INTEGRAÇÃO OBSIDIAN
 -- =============================================================================
 
--- Autocmd Único com delay de estabilidade
-local obsidian_sync_group = vim.api.nvim_create_augroup("ObsidianSync", { clear = true })
-vim.api.nvim_create_autocmd("BufEnter", {
-    group = obsidian_sync_group,
-    pattern = { "*.md", "*.qmd", "*.base" },
-    callback = function()
-        vim.defer_fn(sync_to_obsidian, 200) 
-    end
-})
--- =============================================================================
--- FIM DA INTEGRAÇÃO OBSIDIAN
--- =============================================================================
-
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 if vim.g.have_nerd_font == nil then
     vim.g.have_nerd_font = true
