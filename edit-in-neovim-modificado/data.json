@@ -1,0 +1,19 @@
+{
+  "terminalPath": "/usr/bin/env",
+  "listenOn": "127.0.0.1:2006",
+  "openNeovimOnLoad": false,
+  "headless": false,
+  "supportedFileTypes": [
+    "txt",
+    "qmd",
+    "md",
+    "css",
+    "js",
+    "ts",
+    "tsx",
+    "jsx",
+    "json"
+  ],
+  "binaryPath": "",
+  "appname": "nvim-obsidian"
+}
