@@ -91,8 +91,13 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- =============================================================================
--- PONTE OBSIDIAN (Sincronização Global)
+-- PONTE OBSIDIAN (Sincronização Global Otimizada)
 -- =============================================================================
+
+-- Variável local para evitar disparos repetidos do mesmo arquivo dentro do Neovim
+local last_sent_path = ""
+
+-- Ativa a ponte se detectado o selo da pseudo-config
 if vim.g.launched_from_obsidian then
     vim.g.obsidian_bridge_active = true
 else
@@ -100,6 +105,7 @@ else
 end
 
 local function sync_to_obsidian()
+    -- 1. Verificação de Ativação
     if not vim.g.obsidian_bridge_active then return end
     
     local bufnr = vim.api.nvim_get_current_buf()
@@ -107,24 +113,55 @@ local function sync_to_obsidian()
     local buftype = vim.bo[bufnr].buftype
     local filetype = vim.bo[bufnr].filetype
 
-    -- Filtro para não disparar no Telescope, NeoTree ou buffers vazios
+    -- 2. Filtros de Segurança (Ignora Telescope, janelas técnicas e buffers vazios)
     if buftype ~= "" or filetype == "TelescopePrompt" or filepath == "" then 
         return
     end
     
-    -- Filtra extensões do Vault
+    -- 3. Filtro de Extensões
     if not (filepath:find("%.md$") or filepath:find("%.qmd$") or filepath:find("%.base$")) then
         return
     end
 
-    -- Codifica espaços para o shell
+    -- 4. LÓGICA ANTI-LOOP E ANTI-DUPLICAÇÃO
+    -- 'obsidian_last_sync_path' é a variável que o Obsidian injeta via RPC ao abrir um arquivo
+    local last_obsidian_path = vim.g.obsidian_last_sync_path or ""
+    
+    -- Se o arquivo atual for o mesmo que o Obsidian acabou de nos mandar,
+    -- ou se for o mesmo que já enviamos na última vez, ignoramos para evitar o loop.
+    if filepath == last_obsidian_path or filepath == last_sent_path then
+        return
+    end
+
+    -- Atualiza o cache local
+    last_sent_path = filepath
+
+    -- 5. Sincronização via URI
     local encoded_path = filepath:gsub(" ", "%%20")
     local uri = "obsidian://open?path=" .. encoded_path
 
     if vim.fn.has("unix") == 1 then
         vim.fn.jobstart({"xdg-open", uri})
     end
+
+    -- 6. Limpa a trava do Obsidian após o envio para permitir futuras trocas manuais
+    vim.g.obsidian_last_sync_path = ""
 end
+
+-- Autocmd Único com delay de 250ms
+-- O delay é vital para o Telescope não disparar comandos enquanto você apenas navega na lista
+local obsidian_sync_group = vim.api.nvim_create_augroup("ObsidianSync", { clear = true })
+vim.api.nvim_create_autocmd("BufEnter", {
+    group = obsidian_sync_group,
+    pattern = { "*.md", "*.qmd", "*.base" },
+    callback = function()
+        vim.defer_fn(sync_to_obsidian, 250) 
+    end
+})
+
+-- =============================================================================
+-- FIM DA INTEGRAÇÃO OBSIDIAN
+-- =============================================================================
 
 -- Autocmd Único com delay de estabilidade
 local obsidian_sync_group = vim.api.nvim_create_augroup("ObsidianSync", { clear = true })
