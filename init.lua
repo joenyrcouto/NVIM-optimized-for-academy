@@ -23,3 +23,31 @@ vim.opt.rtp:prepend(original_config)
 -- 6. Carrega o seu init.lua principal
 local main_init = original_config .. "/init.lua"
 dofile(main_init)
+
+-- 7. FUNÇÃO PARA FORÇAR TRANSPARÊNCIA
+local function apply_transparency()
+    -- Grupos que costumam ter cor de fundo
+    local groups = {
+        "Normal",       -- Fundo principal
+        "NormalNC",     -- Fundo de janelas não focadas
+        "SignColumn",   -- Coluna de sinais (ícones de erro/git)
+        "LineNr",       -- Números das linhas
+        "Folded",       -- Código dobrado
+        "EndOfBuffer",  -- O til (~) no fim do arquivo
+        "MsgArea",      -- Área de mensagens/comando
+    }
+    
+    for _, group in ipairs(groups) do
+        vim.api.nvim_set_hl(0, group, { bg = "NONE", ctermbg = "NONE" })
+    end
+end
+
+-- 8. EXECUTA IMEDIATAMENTE
+apply_transparency()
+
+-- 9. CRIA UM AUTOCOMANDO
+-- Isso garante que, se você mudar o tema ou o tema demorar para carregar,
+-- a transparência será reaplicada automaticamente.
+vim.api.nvim_create_autocmd("ColorScheme", {
+    callback = apply_transparency,
+})

@@ -1,65 +1,54 @@
-/* 1. Oculta o contêiner do cabeçalho e elementos irmãos exclusivamente na aba do terminal */
-.workspace-tabs:has(.workspace-leaf-content[data-type="terminal:terminal"]) .workspace-tab-header-container,
-.workspace-tabs:has(.workspace-leaf-content[data-type="terminal:terminal"]) .workspace-tab-header-new-tab,
-.workspace-tabs:has(.workspace-leaf-content[data-type="terminal:terminal"]) .workspace-tab-header-spacer,
-.workspace-tabs:has(.workspace-leaf-content[data-type="terminal:terminal"]) .workspace-tab-header-tab-list {
+/* 1. REMOVE CABEÇALHOS E ABAS */
+.workspace-tabs:has([data-type="terminal:terminal"]) .workspace-tab-header-container,
+.workspace-tabs:has([data-type="terminal:terminal"]) .view-header {
     display: none !important;
 }
 
-/* Oculta elementos irmãos (botão de nova aba e espaçadores) para suprimir a barra superior por completo */
-.workspace-tab-header-new-tab,
-.workspace-tab-header-spacer,
-.workspace-tab-header-tab-list {
-    display: none !important;
-}
-
-/* 2. Zera o preenchimento da área de conteúdo do terminal */
-.workspace-leaf-content[data-type="terminal:terminal"] .view-content {
-    padding: 0 !important;
-    padding-top: 10px !important;
-    padding-bottom: 10px !important;
-    margin: 0 !important;
-    display: flex !important; /* Facilita a expansão do nó filho */
-}
-
-/* 3. Remove a barra de rolagem vertical como entidade do layout */
-.workspace-leaf-content[data-type="terminal:terminal"] .scrollbar.vertical {
-    display: none !important;
-}
-
-/* 4. Expande os contêineres internos do terminal para preenchimento total do espaço */
-.workspace-leaf-content[data-type="terminal:terminal"] .terminal\:terminal,
-.workspace-leaf-content[data-type="terminal:terminal"] .terminal.xterm {
+/* 2. CONFIGURAÇÃO DO CONTÊINER DA GAVETA */
+.workspace-tabs:has([data-type="terminal:terminal"]) {
+    flex: none !important;
+    height: 45px !important; /* Altura quando fechado */
+    min-height: 45px !important;
     width: 100% !important;
-    height: 100% !important;
-}
-
-/* Opcional: Remove o cabeçalho interno da janela (título "Terminal: Open bridge-nvim") para eliminar qualquer espaço residual superior */
-.workspace-leaf-content[data-type="terminal:terminal"] .view-header {
-    display: none !important;
-}
-
-/* Garante a expansão do contêiner e suprime a barra de rolagem nativa do xterm */
-.workspace-leaf-content[data-type="terminal:terminal"] .xterm-scrollable-element,
-.workspace-leaf-content[data-type="terminal:terminal"] .xterm-viewport {
-    overflow: hidden !important;
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* Camufla o espaço residual adotando a cor de fundo nativa do terminal e centraliza a matriz */
-.workspace-leaf-content[data-type="terminal:terminal"] .xterm-screen {
     margin: 0 auto !important;
-    background-color: var(--background-primary) !important;
+    transition: height 0.2s ease-in-out !important;
+    background-color: transparent !important; /* Evita o fundo preto */
+    overflow: hidden !important;
+    z-index: 10;
 }
 
-/* Alternativa restrita apenas ao contêiner que possui o terminal */
-.workspace-tabs:has(.workspace-leaf-content[data-type="terminal:terminal"]):not(.mod-active) {
-    flex-grow: 3.8 !important;
-    transition: flex-grow 0.25s ease;
+/* 3. EXPANSÃO AO FOCAR */
+.workspace-tabs:has([data-type="terminal:terminal"]):focus-within {
+    height: 400px !important;
 }
 
-.workspace-tabs.mod-active:has(.workspace-leaf-content[data-type="terminal:terminal"]) {
-    flex-grow: 30 !important;
-    transition: flex-grow 0.25s ease;
+/* 4. LIMPEZA TOTAL DE FUNDO E PADDING */
+/* Isso garante que o "preto" do terminal não apareça, usando o fundo do Obsidian */
+.workspace-leaf-content[data-type="terminal:terminal"],
+.workspace-leaf-content[data-type="terminal:terminal"] .view-content,
+.workspace-leaf-content[data-type="terminal:terminal"] .terminal-container,
+.workspace-leaf-content[data-type="terminal:terminal"] .xterm-screen,
+.workspace-leaf-content[data-type="terminal:terminal"] .xterm-viewport {
+    background-color: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: 100% !important;
+}
+
+/* 5. AJUSTE DOS CANVAS (Onde o texto aparece) */
+/* NÃO forçamos 100% aqui para não bugar o renderizador */
+.workspace-leaf-content[data-type="terminal:terminal"] canvas {
+    display: block;
+}
+
+/* 6. CENTRALIZA O TERMINAL CASO SOBRE ESPAÇO */
+.terminal.xterm {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: transparent !important;
+}
+
+.workspace-sidedock-vault-profile {
+    height: 46px !important;
 }
