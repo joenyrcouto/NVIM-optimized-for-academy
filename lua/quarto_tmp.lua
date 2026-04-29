@@ -135,7 +135,7 @@ local buffer_config_cache = {}
 
 local default_config = {
   quarto_id = nil,
-  quarto_comp_nativa = false, -- "Push de arquivos para local físico"
+  quarto_push_comp = false, -- "forçar Push de arquivos para pasta do Quarto"
   quarto_modo_escrita = false,
   quarto_usar_local_fisico = true, -- true = local físico, false = usar tmp
   quarto_ignorar_ativos = true,
@@ -178,7 +178,7 @@ local function save_buffer_config(bufnr)
   if not config then return end
   local updates = {
     quarto_id = config.quarto_id,
-    quarto_comp_nativa = config.quarto_comp_nativa,
+    quarto_push_comp = config.quarto_push_comp,
     quarto_modo_escrita = config.quarto_modo_escrita,
     quarto_usar_local_fisico = config.quarto_usar_local_fisico,
     quarto_ignorar_ativos = config.quarto_ignorar_ativos,
@@ -433,6 +433,12 @@ local preview_state = {
   browser_opened = false,
 }
 
+-- Copia conteúdo do diretório de origem para destino, sobrescrevendo sem apagar
+local function copy_dir_contents(src, dest)
+  fn.mkdir(dest, 'p')
+  fn.system({ 'cp', '-r', src .. '/.', dest .. '/' })
+end
+
 local function stop_preview()
   -- Mata o job interno (bash)
   if preview_state.job then
@@ -486,13 +492,21 @@ local function start_preview(shadow_info, file_path, fmt, config)
       local clean_line = line:gsub('\x1b%[[0-9;]*[a-zA-Z]', '')
       local url = clean_line:match '(http://localhost:%d+/[^%s]+)'
       if url and not preview_state.browser_opened then
-        preview_state.url = url
-        preview_state.browser_opened = true
-        vim.schedule(function()
-          open_with_default_app(url)
-          vim.notify('Preview disponível em ' .. url, vim.log.levels.INFO)
-        end)
-      end
+      preview_state.url = url
+      preview_state.browser_opened = true
+      vim.schedule(function()
+        open_with_default_app(url)
+        -- Se push_comp ativo e não local, copia para subpasta nome_id
+        if config.quarto_push_comp and not config.quarto_usar_local_fisico then
+          local fname_no_ext = fn.fnamemodify(file_path, ':t:r')
+          local base_comp = fn.expand '~/Documents/Quarto/Comp/'
+          local comp_subdir = base_comp .. fname_no_ext .. '_' .. config.quarto_id .. '/'
+          copy_dir_contents(shadow_info.dir, comp_subdir)
+          vim.notify('Preview copiado para ' .. comp_subdir, vim.log.levels.INFO)
+        end
+        vim.notify('Preview disponível em ' .. url, vim.log.levels.INFO)
+      end)
+    end
     end
   end
 
@@ -620,56 +634,82 @@ local function quarto_handler(args)
           '',
           ' Pressione 1/2/3 para alternar/abrir, q para sair',
         }
-        local buf, win = open_menu('Configurações (Local)', lines, 60)
+        local buf_main, win_main = open_menu('Configurações (Local)', lines, 60)
         local function update_line()
           lines[3] = ' 1. Modo Escrita: ' .. tostring(config.quarto_modo_escrita)
           lines[4] = ' 2. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido)
-          api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+          api.nvim_buf_set_lines(buf_main, 0, -1, false, lines)
         end
         local function open_templates_local()
           local tdir = fn.expand '~/Documents/Quarto/Temp'
           fn.mkdir(tdir, 'p')
           local items = fn.readdir(tdir)
-          local t_lines = { ' === Templates ===', '' }
-          for _, name in ipairs(items) do
-            table.insert(t_lines, ' -> ' .. name)
+          local t_lines = { ' === Templates (número para selecionar) ===', '' }
+          for i, name in ipairs(items) do
+            table.insert(t_lines, string.format(' %d. %s', i, name))
           end
+          table.insert(t_lines, '')
+          table.insert(t_lines, ' Pressione o número ou Enter sobre o item')
           local tbuf, twin = open_menu('Templates', t_lines, 60)
+          local function close_all_menus()
+            for _, w in ipairs(api.nvim_list_wins()) do
+              local cfg = api.nvim_win_get_config(w)
+              if cfg.relative == 'editor' and cfg.border then
+                api.nvim_win_close(w, true)
+              end
+            end
+          end
+          local function show_action_menu(name)
+            local action_lines = { ' === Ação: ' .. name .. ' ===', '', ' 1. Usar template (substituir buffer)', ' 2. Copiar para clipboard', ' 3. Abrir em split', '', ' q ou Esc para cancelar' }
+            local abuf, awin = open_menu('Ação', action_lines, 55)
+            vim.keymap.set('n', '1', function()
+              local content = fn.readfile(tdir .. '/' .. name)
+              api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
+              buffer_config_cache[bufnr] = nil
+              local new_config = get_buffer_config(bufnr)
+              new_config.quarto_id = fn.sha256(api.nvim_buf_get_name(bufnr) .. os.time()):sub(1, 8)
+              save_buffer_config(bufnr)
+              close_all_menus()
+            end, { buffer = abuf })
+            vim.keymap.set('n', '2', function()
+              fn.setreg('+', table.concat(fn.readfile(tdir .. '/' .. name), '\n'))
+              api.nvim_win_close(awin, true)
+            end, { buffer = abuf })
+            vim.keymap.set('n', '3', function()
+              close_all_menus()
+              vim.cmd('split ' .. fn.fnameescape(tdir .. '/' .. name))
+            end, { buffer = abuf })
+            return awin
+          end
+          -- Keymaps numéricos para templates locais
+          for i = 1, #items do
+            vim.keymap.set('n', tostring(i), function()
+              local name = items[i]
+              show_action_menu(name)
+            end, { buffer = tbuf })
+          end
+          -- Enter sobre o item
           vim.keymap.set('n', '<CR>', function()
+            if not api.nvim_win_is_valid(twin) then return end
             local cursor_idx = api.nvim_win_get_cursor(twin)[1]
             local item_idx = cursor_idx - 2
             if item_idx > 0 and item_idx <= #items then
               local name = items[item_idx]
-              local action = vim.fn.confirm('Usar template?', '&Usar\n&Copiar\nCancelar')
-             if action == 1 then
-            local content = fn.readfile(tdir .. '/' .. name)
-            api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
-            vim.notify('Buffer substituído.', vim.log.levels.INFO)
-            -- Reanalisa o YAML do template e preserva as configurações
-            buffer_config_cache[bufnr] = nil
-            local new_config = get_buffer_config(bufnr)
-            -- Gera um novo ID, mas mantém tudo o que veio do template
-            new_config.quarto_id = fn.sha256(api.nvim_buf_get_name(bufnr) .. os.time()):sub(1, 8)
-            save_buffer_config(bufnr)
-            vim.cmd 'q'
-              elseif action == 2 then
-                fn.setreg('+', table.concat(fn.readfile(tdir .. '/' .. name), '\n'))
-                vim.notify('Copiado.', vim.log.levels.INFO)
-              end
+              show_action_menu(name)
             end
           end, { buffer = tbuf })
         end
         vim.keymap.set('n', '1', function()
           config.quarto_modo_escrita = not config.quarto_modo_escrita
           update_line()
-        end, { buffer = buf })
+        end, { buffer = buf_main })
         vim.keymap.set('n', '2', function()
           config.quarto_modo_rapido = not config.quarto_modo_rapido
           update_line()
-        end, { buffer = buf })
-        vim.keymap.set('n', '3', open_templates_local, { buffer = buf })
+        end, { buffer = buf_main })
+        vim.keymap.set('n', '3', open_templates_local, { buffer = buf_main })
         vim.keymap.set('n', '<CR>', function()
-          local cursor = api.nvim_win_get_cursor(win)[1]
+          local cursor = api.nvim_win_get_cursor(win_main)[1]
           if cursor == 3 then
             config.quarto_modo_escrita = not config.quarto_modo_escrita
             update_line()
@@ -679,7 +719,7 @@ local function quarto_handler(args)
           elseif cursor == 5 then
             open_templates_local()
           end
-        end, { buffer = buf })
+        end, { buffer = buf_main })
         return
       end
     end
@@ -752,10 +792,6 @@ local function quarto_handler(args)
 
     local cmd_args = { 'quarto', 'render', filename_with_ext, '--to', fmt }
     if config.quarto_modo_rapido then table.insert(cmd_args, '--no-execute') end
-    if config.quarto_outputfile and config.quarto_id then
-      table.insert(cmd_args, '--output')
-      table.insert(cmd_args, fn.shellescape(config.quarto_id))
-    end
     fn.jobstart(cmd_args, {
       cwd = compile_dir,
       on_stdout = capture,
@@ -765,20 +801,31 @@ local function quarto_handler(args)
         if code == 0 then
           vim.notify('Render concluído.', vim.log.levels.INFO)
           local out_ext = (fmt == 'latex' and 'tex') or fmt
-          local out_file = compile_dir .. '/' .. filename_no_ext .. '.' .. out_ext
-          if fn.filereadable(out_file) == 1 then open_with_default_app(out_file) end
-          if not config.quarto_usar_local_fisico and config.quarto_comp_nativa then
-            local dest = fn.fnamemodify(original_path, ':p:h') .. '/' .. fn.fnamemodify(out_file, ':t')
-            fn.system { 'cp', out_file, dest }
-            vim.notify('Arquivo copiado para o diretório original.', vim.log.levels.INFO)
+          if not config.quarto_usar_local_fisico then
+            -- Modo tmp: copiar resultado para subpasta nome_id
+            local base_comp = fn.expand '~/Documents/Quarto/Comp/'
+            local comp_subdir = base_comp .. filename_no_ext .. '_' .. config.quarto_id .. '/'
+            copy_dir_contents(compile_dir, comp_subdir)
+            vim.notify('Arquivos copiados para ' .. comp_subdir, vim.log.levels.INFO)
+            -- Abrir o arquivo a partir da cópia
+            local copied_file = comp_subdir .. filename_no_ext .. '.' .. out_ext
+            if fn.filereadable(copied_file) == 1 then
+              open_with_default_app(copied_file)
+            end
+          else
+            -- Modo local: abrir diretamente do diretório original
+            local expected_file = compile_dir .. '/' .. filename_no_ext .. '.' .. out_ext
+            if fn.filereadable(expected_file) == 1 then
+              open_with_default_app(expected_file)
+            end
           end
         else
-          vim.schedule(function()
+        vim.schedule(function()
             vim.notify('Erro na renderização. Abrindo log...', vim.log.levels.ERROR)
             open_log_view(render_log)
-          end)
-        end
-      end,
+        end)
+      end
+    end,
     })
     return
   end
@@ -912,20 +959,42 @@ local function quarto_handler(args)
       local gdir = fn.expand '~/Documents/Quarto/Gerais'
       fn.mkdir(gdir, 'p')
       local items = fn.readdir(gdir)
-      local g_lines = { ' === Gerais (ENTER para toggle) ===', '' }
-      for _, name in ipairs(items) do
-        table.insert(g_lines, (config.quarto_gerais[name] and '[X]' or '[ ]') .. ' ' .. name)
+      -- Sempre usa o cache mais recente para montar as linhas
+      local cfg = get_buffer_config(bufnr)
+      local g_lines = { ' === Gerais (número para toggle) ===', '' }
+      for i, name in ipairs(items) do
+        table.insert(g_lines, ' ' .. i .. '. ' .. (cfg.quarto_gerais[name] and '[X]' or '[ ]') .. ' ' .. name)
       end
+      table.insert(g_lines, '')
+      table.insert(g_lines, ' Pressione o número ou Enter sobre o item')
       local gbuf, gwin = open_menu('Gerais', g_lines, 60)
+
+      -- Função que realmente alterna e salva
+      local function toggle_geral(item_idx)
+        local name = items[item_idx]
+        local cur_cfg = get_buffer_config(bufnr)
+        if cur_cfg.quarto_gerais[name] then
+          cur_cfg.quarto_gerais[name] = nil   -- remove do set
+        else
+          cur_cfg.quarto_gerais[name] = true  -- adiciona ao set
+        end
+        g_lines[item_idx + 2] = ' ' .. item_idx .. '. ' .. (cur_cfg.quarto_gerais[name] and '[X]' or '[ ]') .. ' ' .. name
+        api.nvim_buf_set_lines(gbuf, 0, -1, false, g_lines)
+        buffer_config_cache[bufnr] = cur_cfg
+        save_buffer_config(bufnr)
+      end
+
+      -- Keymaps numéricos (1 a 9)
+      for i = 1, math.min(#items, 9) do
+        vim.keymap.set('n', tostring(i), function() toggle_geral(i) end,
+          { buffer = gbuf, nowait = true, silent = true })
+      end
+      -- Enter sobre o item
       vim.keymap.set('n', '<CR>', function()
         local cursor_idx = api.nvim_win_get_cursor(gwin)[1]
         local item_idx = cursor_idx - 2
         if item_idx > 0 and item_idx <= #items then
-          local name = items[item_idx]
-          config.quarto_gerais[name] = not config.quarto_gerais[name]
-          g_lines[cursor_idx] = (config.quarto_gerais[name] and '[X]' or '[ ]') .. ' ' .. name
-          api.nvim_buf_set_lines(gbuf, 0, -1, false, g_lines)
-          save_buffer_config(bufnr)
+          toggle_geral(item_idx)
         end
       end, { buffer = gbuf })
     end
@@ -934,53 +1003,98 @@ local function quarto_handler(args)
       local edir = fn.expand '~/Documents/Quarto/Extens'
       fn.mkdir(edir, 'p')
       local items = fn.readdir(edir)
-      local e_lines = { ' === Extensões (ENTER para toggle) ===', '' }
-      for _, name in ipairs(items) do
-        table.insert(e_lines, (config.quarto_extensoes[name] and '[X]' or '[ ]') .. ' ' .. name)
+      local cfg = get_buffer_config(bufnr)
+      local e_lines = { ' === Extensões (número para toggle) ===', '' }
+      for i, name in ipairs(items) do
+        table.insert(e_lines, ' ' .. i .. '. ' .. (cfg.quarto_extensoes[name] and '[X]' or '[ ]') .. ' ' .. name)
       end
+      table.insert(e_lines, '')
+      table.insert(e_lines, ' Pressione o número ou Enter sobre o item')
       local ebuf, ewin = open_menu('Extensões', e_lines, 60)
+
+      local function toggle_extensao(item_idx)
+        local name = items[item_idx]
+        local cur_cfg = get_buffer_config(bufnr)
+        if cur_cfg.quarto_extensoes[name] then
+          cur_cfg.quarto_extensoes[name] = nil
+        else
+          cur_cfg.quarto_extensoes[name] = true
+        end
+        e_lines[item_idx + 2] = ' ' .. item_idx .. '. ' .. (cur_cfg.quarto_extensoes[name] and '[X]' or '[ ]') .. ' ' .. name
+        api.nvim_buf_set_lines(ebuf, 0, -1, false, e_lines)
+        buffer_config_cache[bufnr] = cur_cfg
+        save_buffer_config(bufnr)
+      end
+
+      for i = 1, math.min(#items, 9) do
+        vim.keymap.set('n', tostring(i), function() toggle_extensao(i) end,
+          { buffer = ebuf, nowait = true, silent = true })
+      end
       vim.keymap.set('n', '<CR>', function()
         local cursor_idx = api.nvim_win_get_cursor(ewin)[1]
         local item_idx = cursor_idx - 2
         if item_idx > 0 and item_idx <= #items then
-          local name = items[item_idx]
-          config.quarto_extensoes[name] = not config.quarto_extensoes[name]
-          e_lines[cursor_idx] = (config.quarto_extensoes[name] and '[X]' or '[ ]') .. ' ' .. name
-          api.nvim_buf_set_lines(ebuf, 0, -1, false, e_lines)
-          save_buffer_config(bufnr)
+          toggle_extensao(item_idx)
         end
       end, { buffer = ebuf })
     end
 
-    local function open_templates()
+      local function open_templates()
       local tdir = fn.expand '~/Documents/Quarto/Temp'
       fn.mkdir(tdir, 'p')
       local items = fn.readdir(tdir)
-      local t_lines = { ' === Templates ===', '' }
-      for _, name in ipairs(items) do
-        table.insert(t_lines, ' -> ' .. name)
+      local t_lines = { ' === Templates (número para selecionar) ===', '' }
+      for i, name in ipairs(items) do
+        table.insert(t_lines, string.format(' %d. %s', i, name))
       end
+      table.insert(t_lines, '')
+      table.insert(t_lines, ' Pressione o número ou Enter sobre o item')
       local tbuf, twin = open_menu('Templates', t_lines, 60)
+      local function close_all_menus()
+        for _, w in ipairs(api.nvim_list_wins()) do
+          local cfg = api.nvim_win_get_config(w)
+          if cfg.relative == 'editor' and cfg.border then
+            api.nvim_win_close(w, true)
+          end
+        end
+      end
+      local function show_action_menu(name)
+        local action_lines = { ' === Ação: ' .. name .. ' ===', '', ' 1. Usar template (substituir buffer)', ' 2. Copiar para clipboard', ' 3. Abrir em split', '', ' q ou Esc para cancelar' }
+        local abuf, awin = open_menu('Ação', action_lines, 55)
+        vim.keymap.set('n', '1', function()
+          local content = fn.readfile(tdir .. '/' .. name)
+          api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
+          buffer_config_cache[bufnr] = nil
+          local new_config = get_buffer_config(bufnr)
+          new_config.quarto_id = fn.sha256(api.nvim_buf_get_name(bufnr) .. os.time()):sub(1, 8)
+          save_buffer_config(bufnr)
+          close_all_menus()
+        end, { buffer = abuf })
+        vim.keymap.set('n', '2', function()
+          fn.setreg('+', table.concat(fn.readfile(tdir .. '/' .. name), '\n'))
+          api.nvim_win_close(awin, true)
+        end, { buffer = abuf })
+        vim.keymap.set('n', '3', function()
+          close_all_menus()
+          vim.cmd('split ' .. fn.fnameescape(tdir .. '/' .. name))
+        end, { buffer = abuf })
+        return awin
+      end
+      -- Keymaps numéricos para templates
+      for i = 1, #items do
+        vim.keymap.set('n', tostring(i), function()
+          local name = items[i]
+          show_action_menu(name)
+        end, { buffer = tbuf })
+      end
+      -- Enter sobre o item
       vim.keymap.set('n', '<CR>', function()
+        if not api.nvim_win_is_valid(twin) then return end
         local cursor_idx = api.nvim_win_get_cursor(twin)[1]
         local item_idx = cursor_idx - 2
         if item_idx > 0 and item_idx <= #items then
           local name = items[item_idx]
-          local action = vim.fn.confirm('Usar template?', '&Usar\n&Copiar\nCancelar')
-          if action == 1 then
-             local content = fn.readfile(tdir .. '/' .. name)
-             api.nvim_buf_set_lines(bufnr, 0, -1, false, content)
-             vim.notify('Buffer substituído.', vim.log.levels.INFO)
-             -- Reanalisa o YAML do template e preserva as configurações
-             buffer_config_cache[bufnr] = nil
-             local new_config = get_buffer_config(bufnr)
-             new_config.quarto_id = fn.sha256(api.nvim_buf_get_name(bufnr) .. os.time()):sub(1, 8)
-             save_buffer_config(bufnr)
-             vim.cmd 'q'
-          elseif action == 2 then
-            fn.setreg('+', table.concat(fn.readfile(tdir .. '/' .. name), '\n'))
-            vim.notify('Copiado.', vim.log.levels.INFO)
-          end
+          show_action_menu(name)
         end
       end, { buffer = tbuf })
     end
@@ -989,13 +1103,13 @@ local function quarto_handler(args)
       ' === Configurações (salvas no YAML) ===',
       '',
       ' 1. Usar diretório temporário (tmp): ' .. tostring(not config.quarto_usar_local_fisico),
-      ' 2. Push de arquivos para local físico: ' .. tostring(config.quarto_comp_nativa),
+      ' 2. Push de arquivos para Comp: ' .. tostring(config.quarto_push_comp),
       ' 3. Modo Escrita: ' .. tostring(config.quarto_modo_escrita),
       ' 4. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido),
       ' 5. Ignorar Ativos: ' .. tostring(config.quarto_ignorar_ativos),
-      ' 6. Ativos Gerais',
-      ' 7. Extensões',
-      ' 8. Usar output-file simples: ' .. tostring(config.quarto_outputfile),
+      ' 6. Usar output-file simples: ' .. tostring(config.quarto_outputfile),
+      ' 7. Ativos Gerais',
+      ' 8. Ativos para Extensões',
       ' 9. Templates',
       '',
       ' Pressione o número ou <Enter> sobre a linha',
@@ -1004,11 +1118,11 @@ local function quarto_handler(args)
 
     local function update_lines()
       lines[3] = ' 1. Usar diretório temporário (tmp): ' .. tostring(not config.quarto_usar_local_fisico)
-      lines[4] = ' 2. Push de arquivos para local físico: ' .. tostring(config.quarto_comp_nativa)
+      lines[4] = ' 2. Push de arquivos para Comp: ' .. tostring(config.quarto_push_comp)
       lines[5] = ' 3. Modo Escrita: ' .. tostring(config.quarto_modo_escrita)
       lines[6] = ' 4. Modo Rápido (sem executar código): ' .. tostring(config.quarto_modo_rapido)
       lines[7] = ' 5. Ignorar Ativos: ' .. tostring(config.quarto_ignorar_ativos)
-      lines[10] = ' 8. Usar output-file simples: ' .. tostring(config.quarto_outputfile)
+      lines[8] = ' 6. Usar output-file simples: ' .. tostring(config.quarto_outputfile)
       api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     end
 
@@ -1018,12 +1132,12 @@ local function quarto_handler(args)
       save_buffer_config(bufnr)
     end
 
-    local function toggle_quarto_comp_nativa()
+    local function toggle_quarto_push_comp()
       if config.quarto_usar_local_fisico then
         vim.notify('Push só está disponível quando usando diretório tmp.', vim.log.levels.WARN)
         return
       end
-      config.quarto_comp_nativa = not config.quarto_comp_nativa
+      config.quarto_push_comp = not config.quarto_push_comp
       update_lines()
       save_buffer_config(bufnr)
     end
@@ -1035,25 +1149,25 @@ local function quarto_handler(args)
     end
 
     vim.keymap.set('n', '1', toggle_quarto_usar_local_fisico, { buffer = buf })
-    vim.keymap.set('n', '2', toggle_quarto_comp_nativa, { buffer = buf })
+    vim.keymap.set('n', '2', toggle_quarto_push_comp, { buffer = buf })
     vim.keymap.set('n', '3', function() toggle 'quarto_modo_escrita' end, { buffer = buf })
     vim.keymap.set('n', '4', function() toggle 'quarto_modo_rapido' end, { buffer = buf })
     vim.keymap.set('n', '5', function() toggle 'quarto_ignorar_ativos' end, { buffer = buf })
-    vim.keymap.set('n', '6', open_gerais, { buffer = buf })
-    vim.keymap.set('n', '7', open_extensoes, { buffer = buf })
-    vim.keymap.set('n', '8', function() toggle 'quarto_outputfile' end, { buffer = buf })
+    vim.keymap.set('n', '6', function() toggle 'quarto_outputfile' end, { buffer = buf })
+    vim.keymap.set('n', '7', open_gerais, { buffer = buf })
+    vim.keymap.set('n', '8', open_extensoes, { buffer = buf })
     vim.keymap.set('n', '9', open_templates, { buffer = buf })
 
     vim.keymap.set('n', '<CR>', function()
       local cursor = api.nvim_win_get_cursor(win)[1]
       if cursor == 3 then toggle_quarto_usar_local_fisico()
-      elseif cursor == 4 then toggle_quarto_comp_nativa()
+      elseif cursor == 4 then toggle_quarto_push_comp()
       elseif cursor == 5 then toggle 'quarto_modo_escrita'
       elseif cursor == 6 then toggle 'quarto_modo_rapido'
       elseif cursor == 7 then toggle 'quarto_ignorar_ativos'
-      elseif cursor == 8 then open_gerais()
-      elseif cursor == 9 then open_extensoes()
-      elseif cursor == 10 then toggle 'quarto_outputfile'
+      elseif cursor == 8 then toggle 'quarto_outputfile'
+      elseif cursor == 9 then open_gerais()
+      elseif cursor == 10 then open_extensoes()
       elseif cursor == 11 then open_templates()
       end
     end, { buffer = buf })
