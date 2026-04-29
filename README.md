@@ -104,7 +104,7 @@ Documents/
 ## 🧪 Configuração rápida
 
 1. Clone este repositório em `~/.config/nvim`.
-2. Instale as dependências: `Lazygit`, `Git-bug`, `Github CLI`, `Quarto CLI`, `vim-slime`, `gh` e `nvr`.
+2. Instale as dependências: `Lazygit`, `Git-bug`, `Github CLI`, `Quarto CLI`, `vim-slime`, `gh`, `xdotool` e `nvr`.
 3. Configure o Kitty para remote control (necessário para `<leader>gl`).
 4. Inicie o LM Studio com um modelo e ajuste a URL/porta no bloco do CodeCompanion.
 

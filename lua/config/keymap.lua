@@ -27,6 +27,17 @@ map('n', '<C-S-D>', function()
   end)
 end, { desc = 'Excluir arquivo atual' })
 
+-- Caminho do .git
+local function get_working_dir()
+  local bufpath = vim.api.nvim_buf_get_name(0)
+  if bufpath ~= '' then
+    return vim.fn.fnamemodify(bufpath, ':p:h')
+  else
+    return vim.fn.getcwd()
+  end
+end
+
+
 -- select last paste
 nmap('gV', '`[v`]')
 
@@ -229,6 +240,16 @@ wk.add({
   { 'n', 'nzzzv', desc = 'center search' },
   { 'z?', ':setlocal spell!<cr>', desc = 'toggle [z]pellcheck' },
   { 'zl', ':Telescope spell_suggest<cr>', desc = '[l]ist spelling suggestions' },
+  { '<leader>gg', function()
+  local cwd = get_working_dir()
+  local output = vim.fn.system('cd ' .. vim.fn.shellescape(cwd) .. ' && git rev-parse --show-toplevel 2>/dev/null')
+  local git_root = output:gsub('%s+', '')
+  if git_root ~= '' then
+    require('lazygit').lazygit(git_root)
+  else
+    require('lazygit').lazygit(cwd)
+  end
+end, desc = 'Open LazyGit' },
 }, { mode = 'n', silent = true })
 
 -- visual mode
@@ -619,15 +640,6 @@ local function adopt_identity_in_repo(git_root, id)
   local cmd = string.format('cd %s && git bug user adopt %s', vim.fn.shellescape(git_root), id)
   local ok = os.execute(cmd .. ' > /dev/null 2>&1')
   return ok == 0
-end
-
-local function get_working_dir()
-  local bufpath = vim.api.nvim_buf_get_name(0)
-  if bufpath ~= '' then
-    return vim.fn.fnamemodify(bufpath, ':p:h')
-  else
-    return vim.fn.getcwd()
-  end
 end
 
 local function get_git_root(cwd)
