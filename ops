@@ -1,0 +1,1 @@
+{"author":{"id":"c607a7cced8ae2a8385ea8a96ea8388f455c44b800b1a4ea94ae379a938fddc9"},"ops":[{"type":1,"timestamp":1777427589,"nonce":"VOeCX7LU4S2eA390UNEP64WTHjQ=","title":"Baixo dinâmismo do Lazygit","message":"Ele está abrindo o repositório para a pasta atual, ao invés de seguir o fluxo de pocurar por: arquivo atual, endereço atual, pasta pai do endereço atual.","files":null}]}
