@@ -552,10 +552,15 @@ wk.add {
     {
       '<leader>oo',
       function()
+        -- Alterna a materialização do texto
+        local sw_ok, sw = pcall(require, "shadow-wrap")
+        if sw_ok then sw.toggle() end
+        
+        -- Alterna a UI visual dos outros plugins
         vim.cmd 'RenderMarkdown toggle'
         vim.cmd 'ObsidianToggleUI'
       end,
-      desc = 'Modo de origem (Toggle UI)',
+      desc = 'Toggle Render/Source Mode (Shadow Wrap)',
     },
     { '<leader>od', '<cmd>ObsidianDailies<cr>', desc = 'Lista de Notas Diárias' },
     { '<leader>of', '<cmd>ObsidianQuickSwitch<cr>', desc = 'Quick Switch (Telescope/FZF)' },

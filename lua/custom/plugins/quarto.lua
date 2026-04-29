@@ -109,32 +109,30 @@ return {
         local client = vim.lsp.get_client_by_id(event.data.client_id)
         local bufnr = event.buf
 
-        -- ===== JULIALS: RESTRINGIR A ARQUIVOS .jl =====
-        if client.name == 'julials' then
-          local ft = vim.bo[bufnr].filetype
-          -- Se não for julia, desativa completamente o cliente neste buffer
-          if ft ~= 'julia' and ft ~= 'quarto' then
-            client:stop()
-            return
-          end
-          -- Para arquivos julia, desabilita funcionalidades problemáticas
-          client.server_capabilities.documentFormattingProvider = false
-          client.server_capabilities.documentRangeFormattingProvider = false
-          client.server_capabilities.documentHighlightProvider = false
-          client.server_capabilities.semanticTokensProvider = false
-        end
+        -- ===== JULIALS =====
+  if client.name == 'julials' then
+    local ft = vim.bo[bufnr].filetype
+    if ft ~= 'julia' and ft ~= 'quarto' then
+      client:stop()
+      return
+    end
+    client.server_capabilities.documentFormattingProvider = false
+    client.server_capabilities.documentRangeFormattingProvider = false
+    client.server_capabilities.documentHighlightProvider = false
+    client.server_capabilities.semanticTokensProvider = false
+  end
 
-        vim.api.nvim_create_autocmd('LspAttach', {
-          callback = function(args)
-            local client = vim.lsp.get_client_by_id(args.data.client_id)
-            if client and client.name == 'obsidian' then
-              -- Desabilita completamente o diagnóstico de links
-              client.server_capabilities.diagnosticProvider = false
-              -- Ou, se preferir desabilitar apenas um tipo específico:
-              -- vim.lsp.diagnostic.enable(false, args.buf)
-            end
-          end,
-        })
+  -- ===== R LANGUAGE SERVER =====
+  if client.name == 'r_language_server' then
+    client.server_capabilities.documentFormattingProvider = false
+    client.server_capabilities.documentRangeFormattingProvider = false
+    client.server_capabilities.documentHighlightProvider = false
+  end
+
+  -- ===== OBSIDIAN =====
+  if client.name == 'obsidian' then
+    client.server_capabilities.diagnosticProvider = false
+  end
 
         vim.bo[bufnr].omnifunc = 'v:lua.vim.lsp.omnifunc'
         local opts = { noremap = true, silent = true, buffer = bufnr }
@@ -168,7 +166,7 @@ return {
       -- Configuração dos servidores via vim.lsp.config (NOVA API)
       local servers = {
         r_language_server = {
-          filetypes = { 'r', 'rmd', 'quarto' },
+          filetypes = { 'r', },
         },
         cssls = {},
         html = {},

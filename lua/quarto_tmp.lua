@@ -471,7 +471,7 @@ local function start_preview(shadow_info, file_path, fmt, config)
     if not data then return end
     for _, line in ipairs(data) do
       local clean_line = line:gsub('\x1b%[[0-9;]*[a-zA-Z]', '')
-      local url = clean_line:match '(http://localhost:%d+/[%w_.-]+)'
+      local url = clean_line:match '(http://localhost:%d+)'
       if url and not preview_state.browser_opened then
         preview_state.url = url
         preview_state.browser_opened = true
@@ -972,7 +972,7 @@ local function quarto_handler(args)
     end, { buffer = buf })
 
     vim.keymap.set('n', '8', function()
-      local tdir = fn.expand '~/Documents/Quarto/temp'
+      local tdir = fn.expand '~/Documents/Quarto/Temp'
       fn.mkdir(tdir, 'p')
       local items = fn.readdir(tdir)
       local t_lines = { ' === Templates ===', '' }
