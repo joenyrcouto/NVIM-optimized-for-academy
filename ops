@@ -1,0 +1,1 @@
+{"author":{"id":"c607a7cced8ae2a8385ea8a96ea8388f455c44b800b1a4ea94ae379a938fddc9"},"ops":[{"type":1,"timestamp":1777427773,"nonce":"u1+qZnQP5twVDrmkg4Hhb06Pr3Y=","title":"GitBug está com mesmo problema do Lazy","message":"Provavelmente estão usando o arquivo inicial que o nvim abriu, mas tens que usar o buff (mesmo se estiver sem arquivo).","files":null}]}
